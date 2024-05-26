@@ -92,13 +92,11 @@ def get_username():
     return pwd.getpwuid(os.getuid())[0]
 
 #===============================================================================
-# INTERNET IP CHANGE currently not used
+# Satellite Scan
 #===============================================================================
 def check_internet_IP():
     # Header
-    print('Check Internet IP')
-    print('    Timestamp:', startTime )
-    print('\nRetrieving Internet IP...')
+    print('    Retrieving Internet IP...')
     internet_IP = get_internet_IP()
 
     # Check result = IP
@@ -109,12 +107,14 @@ def check_internet_IP():
     
     print('   ', internet_IP)
 
-    internet_detection= []
-    internet_detection = {
-        "mac": "Internet" + SATELLITE_TOKEN,
-        "ip": pNewIP
+    internet_detection = []
+    internet_scan = {
+        "mac": "Internet - " + SATELLITE_TOKEN,
+        "ip": internet_IP
     }
 
+    internet_detection.append(internet_scan)
+    
     return internet_detection
 
 # ------------------------------------------------------------------------------
@@ -135,8 +135,6 @@ def parse_cron_part(cron_part, current_value, cron_min_value, cron_max_value):
 
 #-------------------------------------------------------------------------------
 def get_internet_IP():
-    # dig_args = ['dig', '+short', '-4', 'myip.opendns.com', '@resolver1.opendns.com']
-    # cmd_output = subprocess.check_output (dig_args, universal_newlines=True)
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
     cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
     return check_IP_format (cmd_output)
@@ -152,9 +150,7 @@ def check_IP_format(pIP):
         return ""
     return IP.group(0)
 
-#===============================================================================
-# UPDATE DEVICE MAC VENDORS
-#===============================================================================
+#-------------------------------------------------------------------------------
 def update_devices_MAC_vendors (pArg = ''):
     print('Update HW Vendors')
     print('    Timestamp:', startTime )
@@ -200,9 +196,7 @@ def query_MAC_vendor(pMAC):
     except subprocess.CalledProcessError :
         return -1
             
-#===============================================================================
-# SCAN NETWORK
-#===============================================================================
+#-------------------------------------------------------------------------------
 def scan_network():
     output_file_path = PIALERT_PATH + "/log/pialert.scan.log"
     original_stdout = sys.stdout
@@ -215,10 +209,10 @@ def scan_network():
         # Header
         print('Scan Devices')
         print('    Timestamp:', startTime )
-        print('\nTest Internet Connectivity...')
+        print('\nCheck Internet Connectivity...')
         internet_detection = check_internet_IP()
         # arp-scan command
-        print('Scanning...')
+        print('\nScanning...')
         print('    arp-scan Method...')
         print_log ('arp-scan starts...')
         arpscan_devices = execute_arpscan()
