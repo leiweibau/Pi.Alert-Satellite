@@ -33,10 +33,10 @@ STATUS_FILE_BACKUP = PIALERT_BACK_PATH + "/.backup"
 
 if (sys.version_info > (3,0)):
     exec(open(PIALERT_PATH + "/config/version.conf").read())
-    exec(open(PIALERT_PATH + "/config/pialert.conf").read())
+    exec(open(PIALERT_PATH + "/config/satellite.conf").read())
 else:
     execfile(PIALERT_PATH + "/config/version.conf")
-    execfile(PIALERT_PATH + "/config/pialert.conf")
+    execfile(PIALERT_PATH + "/config/satellite.conf")
 
 #===============================================================================
 # MAIN
@@ -67,9 +67,7 @@ def main():
     cycle = str(sys.argv[1])
 
     # internet_IP currently not used
-    if cycle == 'internet_IP':
-        res = check_internet_IP()
-    elif cycle == 'update_vendors':
+    if cycle == 'update_vendors':
         res = update_devices_MAC_vendors()
     elif cycle == 'update_vendors_silent':
         res = update_devices_MAC_vendors('-s')
@@ -108,24 +106,16 @@ def check_internet_IP():
         print('    Error retrieving Internet IP')
         print('    Exiting...\n')
         return 1
+    
     print('   ', internet_IP)
 
-    # # Get previous stored IP
-    # print('\nRetrieving previous IP...')
-    # openDB()
-    # previous_IP = get_previous_internet_IP()
-    # print('   ', previous_IP)
+    internet_detection= []
+    internet_detection = {
+        "mac": "Internet" + SATELLITE_TOKEN,
+        "ip": pNewIP
+    }
 
-    # # Check IP Change
-    # if internet_IP != previous_IP :
-    #     print('    Saving new IP')
-    #     save_new_internet_IP (internet_IP)
-    #     print('        IP updated')
-    # else :
-    #     print('    No changes to perform')
-    # closeDB()
-
-    return 0
+    return internet_detection
 
 # ------------------------------------------------------------------------------
 def parse_cron_part(cron_part, current_value, cron_min_value, cron_max_value):
@@ -150,30 +140,6 @@ def get_internet_IP():
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
     cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
     return check_IP_format (cmd_output)
-    
-#-------------------------------------------------------------------------------
-# def get_previous_internet_IP():
-#     # get previos internet IP stored in DB
-#     sql.execute ("SELECT dev_LastIP FROM Devices WHERE dev_MAC = 'Internet' ")
-#     return sql.fetchone()[0]
-
-#-------------------------------------------------------------------------------
-def save_new_internet_IP(pNewIP):
-    # Log new IP into logfile
-    append_line_to_file (LOG_PATH + '/IP_changes.log',
-        str(startTime) +'\t'+ pNewIP +'\n')
-    # # Save event
-    # sql.execute ("""INSERT INTO Events (eve_MAC, eve_IP, eve_DateTime,
-    #                     eve_EventType, eve_AdditionalInfo,
-    #                     eve_PendingAlertEmail)
-    #                 VALUES ('Internet', ?, ?, 'Internet IP Changed',
-    #                     'Previous Internet IP: '|| ?, 1) """,
-    #                 (pNewIP, startTime, get_previous_internet_IP() ) )
-    # # Save new IP
-    # sql.execute ("""UPDATE Devices SET dev_LastIP = ?
-    #                 WHERE dev_MAC = 'Internet' """,
-    #                 (pNewIP,) )
-    # sql_connection.commit()
     
 #-------------------------------------------------------------------------------
 def check_IP_format(pIP):
@@ -249,9 +215,10 @@ def scan_network():
         # Header
         print('Scan Devices')
         print('    Timestamp:', startTime )
-
+        print('\nTest Internet Connectivity...')
+        internet_detection = check_internet_IP()
         # arp-scan command
-        print('\nScanning...')
+        print('Scanning...')
         print('    arp-scan Method...')
         print_log ('arp-scan starts...')
         arpscan_devices = execute_arpscan()
@@ -275,7 +242,7 @@ def scan_network():
         print('\nProcessing scan results...')
         # Load current scan data 2/2
         print('    Create json of scanned devices')
-        jsondata = save_scanned_devices (arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
+        jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
         print('    Encrypt data')
         encrypt_scandata(jsondata)
         print('    Transmit to Master')
@@ -472,9 +439,20 @@ def read_unifi_clients():
     return unifi_network
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
 
     all_devices = []
+
+    if bool(p_internet_detection):
+        for device in p_internet_detection:
+            device_data = {
+                'cur_MAC': device['mac'],
+                'cur_IP': "",
+                'cur_Vendor': "",
+                'cur_ScanMethod': 'Internet Check',
+                'cur_SatelliteID': SATELLITE_TOKEN
+            }
+            all_devices.append(device_data)
 
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
@@ -483,7 +461,7 @@ def save_scanned_devices(p_arpscan_devices, p_fritzbox_network, p_mikrotik_netwo
                 'cur_IP': device['ip'],
                 'cur_Vendor': device['hw'],
                 'cur_ScanMethod': 'arp-scan',
-                'cur_PiA_Instance': SATELLITE_TOKEN
+                'cur_SatelliteID': SATELLITE_TOKEN
             }
             all_devices.append(device_data)
 
@@ -494,7 +472,7 @@ def save_scanned_devices(p_arpscan_devices, p_fritzbox_network, p_mikrotik_netwo
                 'cur_IP': device['ip'],
                 'cur_Vendor': device['vendor'],
                 'cur_ScanMethod': 'Fritzbox',
-                'cur_PiA_Instance': SATELLITE_TOKEN
+                'cur_SatelliteID': SATELLITE_TOKEN
             }
             all_devices.append(device_data)
 
@@ -505,7 +483,7 @@ def save_scanned_devices(p_arpscan_devices, p_fritzbox_network, p_mikrotik_netwo
                 'cur_IP': device['ip'],
                 'cur_Vendor': device['vendor'],
                 'cur_ScanMethod': 'Mikrotik',
-                'cur_PiA_Instance': SATELLITE_TOKEN
+                'cur_SatelliteID': SATELLITE_TOKEN
             }
             all_devices.append(device_data)
 
@@ -516,7 +494,7 @@ def save_scanned_devices(p_arpscan_devices, p_fritzbox_network, p_mikrotik_netwo
                 'cur_IP': device['ip'],
                 'cur_Vendor': device['vendor'],
                 'cur_ScanMethod': 'UniFi',
-                'cur_PiA_Instance': SATELLITE_TOKEN
+                'cur_SatelliteID': SATELLITE_TOKEN
             }
             all_devices.append(device_data)
 
