@@ -45,8 +45,6 @@ def main():
     global startTime
     global cycle
     global log_timestamp
-    # global sql_connection
-    # global sql
 
     # Header
     print('\nPi.Alert Satellite v'+ VERSION_DATE)
@@ -492,30 +490,32 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
             }
             all_devices.append(device_data)
 
-    return all_devices
-
-    # Check Internet connectivity
-    # internet_IP = get_internet_IP()
-        # TESTING - Force IP
-        # internet_IP = ""
-    # if internet_IP != "" :
-        # sql.execute ("""INSERT INTO CurrentScan (cur_ScanCycle, cur_MAC, cur_IP, cur_Vendor, cur_ScanMethod)
-        #                 VALUES (?, 'Internet', ?, Null, 'queryDNS') """, (cycle, internet_IP) )
-
+    # Get Satellite MAC
     local_mac_cmd = ["/sbin/ifconfig `ip -o route get 1 | sed 's/^.*dev \\([^ ]*\\).*$/\\1/;q'` | grep ether | awk '{print $2}'"]
     local_mac = subprocess.Popen (local_mac_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
     
-    # local_ip_cmd = ["ip route list default | awk {'print $7'}"]
+    # Get Satellite IP
     local_ip_cmd = ["ip -o route get 1 | sed 's/^.*src \\([^ ]*\\).*$/\\1/;q'"]
     local_ip = subprocess.Popen (local_ip_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
 
-    # Check if local mac has been detected with other methods
-    # sql.execute ("SELECT COUNT(*) FROM CurrentScan WHERE cur_ScanCycle = ? AND cur_MAC = ? ", (cycle, local_mac) )
-    # if sql.fetchone()[0] == 0 :
-    #     sql.execute ("INSERT INTO CurrentScan (cur_ScanCycle, cur_MAC, cur_IP, cur_Vendor, cur_ScanMethod) "+
-    #                  "VALUES ( ?, ?, ?, Null, 'local_MAC') ", (cycle, local_mac, local_ip) )
+    # Prepare Satellite Meta Data
+    satellite_meta_data = [{
+        'hostname': 'Awesome Satellite',
+        'satellite_ip': local_ip,
+        'satellite_mac': local_mac,
+        'some_weird_things': 'nothing',
+        'location': 'north pole',
+        'you_name_it': 'Internet Check',
+        'SatelliteID': SATELLITE_TOKEN
+    }]
 
     # Write Data to JSON-file
+    export_all_scans = {
+        'satellite_meta_data': satellite_meta_data,
+        'scan_results': all_devices
+    }
+
+    return export_all_scans
 
 #-------------------------------------------------------------------------------
 def encrypt_scandata(json_data):
