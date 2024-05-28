@@ -1,7 +1,7 @@
 # Pi.Alert Satellite
 A companion script for Pi.Alert, which executes the Pi.Alert scan on an external host and sends the data as encrypted JSON to an existing Pi.Alert instance via a separate API.
 
-As I am still in the test/trial phase, there are still many things that are not possible. From time to time the things that work are in the commits. 
+As I am still in the test/trial phase, there are still many things that are not possible. From time to time, the things that work are listed in the commits. 
 The whole thing is still a prototype or feasibility study and there is no guarantee that the work on this will be completed. For this reason, I will not work on any issues that are still in this prototype phase.
 
 ## Concept:
