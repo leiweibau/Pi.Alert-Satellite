@@ -226,9 +226,8 @@ def scan_network():
     # Load current scan data 2/2
     print('    Create json of scanned devices')
     jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
-    print('    Encrypt data')
-    encrypt_scandata(jsondata)
-    print('    Transmit to Master')
+    print('    Encrypt data and transmit to Master')
+    encrypt_submit_scandata(jsondata)
 
     return 0
 
@@ -487,15 +486,17 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     local_ip_cmd = ["ip -o route get 1 | sed 's/^.*src \\([^ ]*\\).*$/\\1/;q'"]
     local_ip = subprocess.Popen (local_ip_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
 
+    local_hostname = socket.gethostname()
+
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
-        'hostname': 'Awesome Satellite',
+        'hostname': local_hostname,
         'satellite_ip': local_ip,
         'satellite_mac': local_mac,
+        'satellite_id': SATELLITE_TOKEN,
         'some_weird_things': 'nothing',
         'location': 'north pole',
-        'you_name_it': 'Internet Check',
-        'SatelliteID': SATELLITE_TOKEN
+        'you_name_it': 'Something unimportant'
     }]
 
     # Write Data to JSON-file
@@ -507,14 +508,14 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     return export_all_scans
 
 #-------------------------------------------------------------------------------
-def encrypt_scandata(json_data):
+def encrypt_submit_scandata(json_data):
 
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-    # Konvertiere das Dictionary in JSON und dann in Binärdaten
+    # Convert the dictionary to JSON and then to binary data
     enc_json_data = json.dumps(json_data).encode('utf-8')
 
-    # OpenSSL-Befehl zum Verschlüsseln der Daten
+    # OpenSSL command for encrypting the data
     openssl_command = [
         "openssl", "enc", "-aes-256-cbc", "-salt", "-out", "encrypted_scandata", "-pbkdf2",
         "-pass", "pass:{}".format(SATELLITE_PASSWORD)
@@ -523,20 +524,19 @@ def encrypt_scandata(json_data):
     with subprocess.Popen(openssl_command, stdin=subprocess.PIPE) as proc:
         proc.stdin.write(enc_json_data)
 
-    # # DEBUG
+    # DEBUG
     # with open('output.json', 'w') as outfile:
     #     json.dump(json_data, outfile, indent=4)
 
-    # Lese die verschlüsselten Daten aus der Datei
+    # Read the encrypted data from the file
     with open("encrypted_scandata", "rb") as f:
         encrypted_data = f.read()
 
-    # Die Daten für die API-Anfrage
+    # The data for the API requeste
     post_data = {
         "TOKEN": SATELLITE_TOKEN
     }
-
-    # Dateien für die API-Anfrage
+    # Files for the API request
     files = {
         "encrypted_data": ("encrypted_scandata", encrypted_data)
     }
@@ -544,47 +544,20 @@ def encrypt_scandata(json_data):
     # API-URL
     api_url = SATELLITE_MASTER_URL
 
-    # Die Anfrage an die API senden, dabei SSL-Verifizierung deaktivieren
+    # Send the request to the API, deactivating SSL verification in the process
     response = requests.post(api_url, data=post_data, files=files, verify=False)
 
-    # try:
-    #     response_data = response.json()
-    #     print("API-Antwort:")
-    #     print(response_data)
-    # except json.JSONDecodeError:
-    #     print("ERROR / Raw output:")
-    #     print(response.text)
-
-
-#-------------------------------------------------------------------------------
-def write_file(pPath, pText):
-    # Write the text depending using the correct python version
-    if sys.version_info < (3, 0):
-        file = io.open (pPath , mode='w', encoding='utf-8')
-        file.write ( pText.decode('unicode_escape') )
-    else:
-        file = open (pPath, 'w', encoding='utf-8')
-        file.write (pText) 
-
-    file.close() 
-
-#-------------------------------------------------------------------------------
-def append_line_to_file(pPath, pText):
-    # append the line depending using the correct python version
-    if sys.version_info < (3, 0):
-        file = io.open (pPath , mode='a', encoding='utf-8')
-        file.write ( pText.decode('unicode_escape') )
-    else:
-        file = open (pPath, 'a', encoding='utf-8')
-        file.write (pText) 
-
-    file.close() 
-
-#-------------------------------------------------------------------------------
-def SafeParseGlobalBool(boolVariable):
-    if boolVariable in globals():
-        return eval(boolVariable)
-    return False
+    try:
+        response_data = response.json()
+        print(f"    API-Response: {response_data}")
+        # print(response_data)
+    except json.JSONDecodeError:
+        print("     API-Response: ERROR:")
+        print("------------------------------------------------------------------------")
+        print("                                Raw output")
+        print("------------------------------------------------------------------------")
+        print(response.text)
+        print("------------------------------------------------------------------------")
 
 #===============================================================================
 # UTIL
