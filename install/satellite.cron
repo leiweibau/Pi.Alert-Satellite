@@ -1,0 +1,2 @@
+0 3 * * 1      python3 $HOME/pialert_satellite/back/satellite.py update_vendors  >$HOME/pialert_satellite/log/satellite.vendors.log  2>&1
+*/5 * * * *    python3 $HOME/pialert_satellite/back/satellite.py scan            >$HOME/pialert_satellite/log/satellite.scan.log     2>&1

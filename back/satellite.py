@@ -21,22 +21,21 @@ from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
 import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json
-from Crypto.Cipher import AES
 
 #===============================================================================
 # CONFIG CONSTANTS
 #===============================================================================
-PIALERT_BACK_PATH = os.path.dirname(os.path.abspath(__file__))
-PIALERT_PATH = PIALERT_BACK_PATH + "/.."
-STATUS_FILE_SCAN = PIALERT_BACK_PATH + "/.scanning"
-STATUS_FILE_BACKUP = PIALERT_BACK_PATH + "/.backup"
+SATELLITE_BACK_PATH = os.path.dirname(os.path.abspath(__file__))
+SATELLITE_PATH = SATELLITE_BACK_PATH + "/.."
+STATUS_FILE_SCAN = SATELLITE_BACK_PATH + "/.scanning"
+STATUS_FILE_BACKUP = SATELLITE_BACK_PATH + "/.backup"
 
 if (sys.version_info > (3,0)):
-    exec(open(PIALERT_PATH + "/config/version.conf").read())
-    exec(open(PIALERT_PATH + "/config/satellite.conf").read())
+    exec(open(SATELLITE_PATH + "/config/version.conf").read())
+    exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
 else:
-    execfile(PIALERT_PATH + "/config/version.conf")
-    execfile(PIALERT_PATH + "/config/satellite.conf")
+    execfile(SATELLITE_PATH + "/config/version.conf")
+    execfile(SATELLITE_PATH + "/config/satellite.conf")
 
 #===============================================================================
 # MAIN
@@ -155,7 +154,7 @@ def update_devices_MAC_vendors (pArg = ''):
 
     # Update vendors DB (oui)
     print('\nUpdating vendors DB...')
-    update_args = ['sh', PIALERT_BACK_PATH + '/update_vendors.sh', pArg]
+    update_args = ['sh', SATELLITE_BACK_PATH + '/update_vendors.sh', pArg]
     update_output = subprocess.check_output (update_args)
 
     # mac-vendor-lookup update
@@ -196,50 +195,40 @@ def query_MAC_vendor(pMAC):
             
 #-------------------------------------------------------------------------------
 def scan_network():
-    output_file_path = PIALERT_PATH + "/log/pialert.scan.log"
-    original_stdout = sys.stdout
-    with open(output_file_path, "w") as f:
-        sys.stdout = f
-        # Create scan status file
-        with open(STATUS_FILE_SCAN, "w") as f:
-            f.write("")
-
-        # Header
-        print('Scan Devices')
-        print('    Timestamp:', startTime )
-        print('\nCheck Internet Connectivity...')
-        internet_detection = check_internet_IP()
-        # arp-scan command
-        print('\nScanning...')
-        print('    arp-scan Method...')
-        print_log ('arp-scan starts...')
-        arpscan_devices = execute_arpscan()
-        print_log ('arp-scan ends')
-        # Fritzbox
-        print('    Fritzbox Method...')
-        # openDB()
-        print_log ('Fritzbox copy starts...')
-        fritzbox_network = read_fritzbox_active_hosts()
-        # Mikrotik
-        print('    Mikrotik Method...')
-        # openDB()
-        print_log ('Mikrotik copy starts...')
-        mikrotik_network = read_mikrotik_leases()
-        # UniFi
-        print('    UniFi Method...')
-        # openDB()
-        print_log ('UniFi copy starts...')
-        unifi_network = read_unifi_clients()
-        # Load current scan data 1/2
-        print('\nProcessing scan results...')
-        # Load current scan data 2/2
-        print('    Create json of scanned devices')
-        jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
-        print('    Encrypt data')
-        encrypt_scandata(jsondata)
-        print('    Transmit to Master')
-
-    sys.stdout = original_stdout
+    # Header
+    print('Scan Devices')
+    print('    Timestamp:', startTime )
+    print('\nCheck Internet Connectivity...')
+    internet_detection = check_internet_IP()
+    # arp-scan command
+    print('\nScanning...')
+    print('    arp-scan Method...')
+    print_log ('arp-scan starts...')
+    arpscan_devices = execute_arpscan()
+    print_log ('arp-scan ends')
+    # Fritzbox
+    print('    Fritzbox Method...')
+    # openDB()
+    print_log ('Fritzbox copy starts...')
+    fritzbox_network = read_fritzbox_active_hosts()
+    # Mikrotik
+    print('    Mikrotik Method...')
+    # openDB()
+    print_log ('Mikrotik copy starts...')
+    mikrotik_network = read_mikrotik_leases()
+    # UniFi
+    print('    UniFi Method...')
+    # openDB()
+    print_log ('UniFi copy starts...')
+    unifi_network = read_unifi_clients()
+    # Load current scan data 1/2
+    print('\nProcessing scan results...')
+    # Load current scan data 2/2
+    print('    Create json of scanned devices')
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
+    print('    Encrypt data')
+    encrypt_scandata(jsondata)
+    print('    Transmit to Master')
 
     return 0
 

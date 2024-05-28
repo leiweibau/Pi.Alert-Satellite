@@ -15,10 +15,10 @@
   ROWS=12
   
   INSTALL_DIR=~
-  PIALERT_HOME="$INSTALL_DIR/pialert_satellite"
+  PIALERT_SATELLITE_HOME="$INSTALL_DIR/pialert_satellite"
 
   
-  LOG="pialert_install_`date +"%Y-%m-%d_%H-%M"`.log"
+  LOG="satellite_install_`date +"%Y-%m-%d_%H-%M"`.log"
   
   # MAIN_IP=`ip -o route get 1 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'`
   MAIN_IP=`ip -o route get 1 | sed 's/^.*src \([^ ]*\).*$/\1/;q'`
@@ -36,13 +36,12 @@ main() {
   log "Logfile: $LOG"
   install_dependencies
 
-  check_pialert_home
+  check_pialert_satellite_home
 
   set -e
 
-  install_arpscan
-  install_python
-  install_pialert
+  install_additional_dependencies
+  install_pialert_satellite
 
   print_header "Installation process finished"
   print_msg ""
@@ -54,7 +53,7 @@ main() {
 # ------------------------------------------------------------------------------
 # Install arp-scan & dnsutils
 # ------------------------------------------------------------------------------
-install_arpscan() {
+install_additional_dependencies() {
   print_header "arp-scan, dnsutils and nmap"
 
   print_msg "- Installing arp-scan..."
@@ -69,60 +68,46 @@ install_arpscan() {
 
   print_msg "- Installing nmap, zip, aria2 and wakeonlan"
   sudo apt-get install aria2 -y                                             2>&1 >> "$LOG"
-}
-  
-# ------------------------------------------------------------------------------
-# Install Python
-# ------------------------------------------------------------------------------
-install_python() {
+
   print_header "Python"
 
   check_python_versions
 
-  if [ $USE_PYTHON_VERSION -eq 0 ] ; then
-    print_msg "- Using the available Python version installed"
-    if $PYTHON3 ; then
-      print_msg "  - Python 3 is available"
-      USE_PYTHON_VERSION=3
-    elif $PYTHON2 ; then
-      print_msg "  - Python 2 is available but no longer compatible with Pi.Alert"
-      print_msg "    - Python 3 will be installed"
-      USE_PYTHON_VERSION=3
-    else
-      print_msg "  - Python is not available in this system"
-      print_msg "    - Python 3 will be installed"
-      USE_PYTHON_VERSION=3
-    fi
-    echo ""
-  fi
-
-  if [ $USE_PYTHON_VERSION -eq 3 ] ; then
-    if $PYTHON3 ; then
-      print_msg "- Using Python 3"
-      sudo apt-get install python3-pip python3-cryptography python3-requests -y                 2>&1 >> "$LOG"
-    else
-      print_msg "- Installing Python 3..."
-      sudo apt-get install python3 python3-pip python3-cryptography python3-requests -y         2>&1 >> "$LOG"
-    fi
-    print_msg "    - Install additional packages"
-    if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
-      pip3 -q install mac-vendor-lookup --break-system-packages --no-warn-script-location       2>&1 >> "$LOG"
-      pip3 -q install fritzconnection --break-system-packages --no-warn-script-location         2>&1 >> "$LOG"
-      pip3 -q install routeros_api --break-system-packages --no-warn-script-location            2>&1 >> "$LOG"
-      pip3 -q install pyunifi --break-system-packages --no-warn-script-location                 2>&1 >> "$LOG"
-      pip3 -q install pycrypto --break-system-packages --no-warn-script-location                2>&1 >> "$LOG"
-    else
-      pip3 -q install mac-vendor-lookup  --no-warn-script-location                              2>&1 >> "$LOG"
-      pip3 -q install fritzconnection --no-warn-script-location                                 2>&1 >> "$LOG"
-      pip3 -q install routeros_api --no-warn-script-location                                    2>&1 >> "$LOG"
-      pip3 -q install pyunifi --no-warn-script-location                                         2>&1 >> "$LOG"
-      pip3 -q install pycrypto --no-warn-script-location                                        2>&1 >> "$LOG"
-    fi
-
-    PYTHON_BIN="python3"
+  if $PYTHON3 ; then
+    print_msg "  - Python 3 is available"
+    USE_PYTHON_VERSION=3
+  elif $PYTHON2 ; then
+    print_msg "  - Python 2 is available but not compatible with Pi.Alert Satellite"
+    print_msg "    - Python 3 will be installed"
+    USE_PYTHON_VERSION=3
   else
-    process_error "Unknown Python version to use: $USE_PYTHON_VERSION"
+    print_msg "  - Python is not available in this system"
+    print_msg "    - Python 3 will be installed"
+    USE_PYTHON_VERSION=3
   fi
+
+  if $PYTHON3 ; then
+    print_msg "- Using Python 3"
+    sudo apt-get install python3-pip python3-cryptography python3-requests -y                 2>&1 >> "$LOG"
+  else
+    print_msg "- Installing Python 3..."
+    sudo apt-get install python3 python3-pip python3-cryptography python3-requests -y         2>&1 >> "$LOG"
+  fi
+  print_msg "    - Install additional packages"
+  if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
+    pip3 -q install mac-vendor-lookup --break-system-packages --no-warn-script-location       2>&1 >> "$LOG"
+    pip3 -q install fritzconnection --break-system-packages --no-warn-script-location         2>&1 >> "$LOG"
+    pip3 -q install routeros_api --break-system-packages --no-warn-script-location            2>&1 >> "$LOG"
+    pip3 -q install pyunifi --break-system-packages --no-warn-script-location                 2>&1 >> "$LOG"
+  else
+    pip3 -q install mac-vendor-lookup  --no-warn-script-location                              2>&1 >> "$LOG"
+    pip3 -q install fritzconnection --no-warn-script-location                                 2>&1 >> "$LOG"
+    pip3 -q install routeros_api --no-warn-script-location                                    2>&1 >> "$LOG"
+    pip3 -q install pyunifi --no-warn-script-location                                         2>&1 >> "$LOG"
+  fi
+
+  PYTHON_BIN="python3"
+
 }
 
 # ------------------------------------------------------------------------------
@@ -155,51 +140,37 @@ check_python_versions() {
 # ------------------------------------------------------------------------------
 # Install Pi.Alert
 # ------------------------------------------------------------------------------
-install_pialert() {
-  # print_header "Pi.Alert"
+install_pialert_satellite() {
+  print_header "Pi.Alert Satellite"
 
-  # download_pialert
-  # configure_pialert
-  # test_pialert
-  # add_jobs_to_crontab
+  download_pialert
+  configure_pialert
+  test_pialert_satellite
+  add_jobs_to_crontab
   # publish_pialert
-  # set_pialert_default_page
 }
 
 # ------------------------------------------------------------------------------
 # Download and uncompress Pi.Alert
 # ------------------------------------------------------------------------------
 download_pialert() {
-  if [ -f "$INSTALL_DIR/pialert_latest.tar" ] ; then
+  if [ -f "$INSTALL_DIR/pialert_satellite_latest.tar" ] ; then
     print_msg "- Deleting previous downloaded tar file"
-    rm -r "$INSTALL_DIR/pialert_latest.tar"
+    rm -r "$INSTALL_DIR/pialert_satellite_latest.tar"
   fi
   
   print_msg "- Downloading installation tar file..."
-  URL="https://github.com/leiweibau/Pi.Alert/raw/main/tar/pialert_latest.tar"
-  # Testing
-  # ----------------------------------
-  #URL=""
-  wget -q --show-progress -O "$INSTALL_DIR/pialert_latest.tar" "$URL"
+  URL="https://github.com/leiweibau/Pi.Alert-Satellite/raw/main/tar/pialert_satellite_latest.tar"
+
+  wget -q --show-progress -O "$INSTALL_DIR/pialert_satellite_latest.tar" "$URL"
   echo ""
 
   print_msg "- Uncompressing tar file"
-  tar xf "$INSTALL_DIR/pialert_latest.tar" -C "$INSTALL_DIR" --checkpoint=100 --checkpoint-action="ttyout=."        2>&1 >> "$LOG"
+  tar xf "$INSTALL_DIR/pialert_satellite_latest.tar" -C "$INSTALL_DIR" --checkpoint=100 --checkpoint-action="ttyout=."        2>&1 >> "$LOG"
   echo ""
 
   print_msg "- Deleting downloaded tar file..."
-  rm -r "$INSTALL_DIR/pialert_latest.tar"                                                                           2>&1 >> "$LOG"
-
-  print_msg "- Generate autocomplete file..."
-  PIALERT_CLI_PATH=$(dirname $PIALERT_HOME)
-  sed -i "s|<YOUR_PIALERT_PATH>|$PIALERT_CLI_PATH/pialert|" $PIALERT_HOME/install/pialert-cli.autocomplete
-
-  print_msg "- Copy autocomplete file..."
-  if [ -d "/etc/bash_completion.d" ] ; then
-      sudo cp $PIALERT_HOME/install/pialert-cli.autocomplete /etc/bash_completion.d/pialert-cli                     2>&1 >> "$LOG"
-  elif [ -d "/usr/share/bash-completion/completions" ] ; then
-      sudo cp $PIALERT_HOME/install/pialert-cli.autocomplete /usr/share/bash-completion/completions/pialert-cli     2>&1 >> "$LOG"
-  fi
+  rm -r "$INSTALL_DIR/pialert_satellite_latest.tar"                                                                           2>&1 >> "$LOG"
 
 }
 
@@ -207,9 +178,9 @@ download_pialert() {
 # Configure Pi.Alert parameters
 # ------------------------------------------------------------------------------
 configure_pialert() {
-  print_msg "- Settting Pi.Alert config file"
+  print_msg "- Setting Pi.Alert config file"
 
-  set_pialert_parameter PIALERT_PATH    "'$PIALERT_HOME'"
+  set_pialert_parameter SATELLITE_PATH    "'$PIALERT_SATELLITE_HOME'"
 
 }
 
@@ -225,13 +196,13 @@ set_pialert_parameter() {
     VALUE="$2"
   fi
   
-  sed -i "/^$1.*=/s|=.*|= $VALUE|" $PIALERT_HOME/config/pialert.conf                             2>&1 >> "$LOG"
+  sed -i "/^$1.*=/s|=.*|= $VALUE|" $PIALERT_SATELLITE_HOME/config/satellite.conf                             2>&1 >> "$LOG"
 }
 
 # ------------------------------------------------------------------------------
 # Test Pi.Alert
 # ------------------------------------------------------------------------------
-test_pialert() {
+test_pialert_satellite() {
   print_msg "- Testing Pi.Alert HW vendors database update process..."
   print_msg "- Prepare directories..."
   if [ ! -e /var/lib/ieee-data ]; then
@@ -239,16 +210,12 @@ test_pialert() {
   fi
 
   print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
-  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_HOME/back/satellite.py update_vendors_silent            2>&1 | tee -ai "$LOG"
-
-  echo ""
-  print_msg "- Testing Pi.Alert Internet IP Lookup..."
-  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_HOME/back/satellite.py internet_IP                      2>&1 | tee -ai "$LOG"
+  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py update_vendors_silent            2>&1 | tee -ai "$LOG"
 
   echo ""
   print_msg "- Testing Pi.Alert Network scan..."
-  print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
-  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_HOME/back/satellite.py scan                             2>&1 | tee -ai "$LOG"
+  # print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
+  # stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py scan                             2>&1 | tee -ai "$LOG"
 
 }
 
@@ -257,17 +224,17 @@ test_pialert() {
 # ------------------------------------------------------------------------------
 add_jobs_to_crontab() {
   if crontab -l 2>/dev/null | grep -Fq pialert ; then
-    print_msg "- Pi.Alert crontab jobs already exists. This is your crontab:"
-    crontab -l | grep -F pialert                                                                 2>&1 | tee -ai "$LOG"
+    print_msg "- Pi.Alert Satellite crontab jobs already exists. This is your crontab:"
+    crontab -l | grep -F pialert_satellite                                                                 2>&1 | tee -ai "$LOG"
     return    
   fi
 
   print_msg "- Adding jobs to the crontab..."
   # if [ $USE_PYTHON_VERSION -eq 3 ] ; then
-  #   sed -i "s/\<python\>/$PYTHON_BIN/g" $PIALERT_HOME/install/pialert.cron
+  #   sed -i "s/\<python\>/$PYTHON_BIN/g" $PIALERT_SATELLITE_HOME/install/pialert.cron
   # fi
 
-  (crontab -l 2>/dev/null || : ; cat $PIALERT_HOME/install/pialert.cron) | crontab -
+  (crontab -l 2>/dev/null || : ; cat $PIALERT_SATELLITE_HOME/install/satellite.cron) | crontab -
 }
 
 # ------------------------------------------------------------------------------
@@ -281,35 +248,22 @@ publish_pialert() {
 
   print_msg "- Setting permissions..."
   chmod go+x $INSTALL_DIR
-  sudo chgrp -R www-data "$PIALERT_HOME/db"                                                                     2>&1 >> "$LOG"
-  sudo chmod -R 775 "$PIALERT_HOME/db"                                                                          2>&1 >> "$LOG"
-  sudo chmod -R 775 "$PIALERT_HOME/db/temp"                                                                     2>&1 >> "$LOG"
-  sudo chgrp -R www-data "$PIALERT_HOME/config"                                                                 2>&1 >> "$LOG"
-  sudo chmod -R 775 "$PIALERT_HOME/config"                                                                      2>&1 >> "$LOG"
-  sudo chgrp -R www-data "$PIALERT_HOME/front/reports"                                                          2>&1 >> "$LOG"
-  sudo chmod -R 775 "$PIALERT_HOME/front/reports"                                                               2>&1 >> "$LOG"
-  sudo chgrp -R www-data "$PIALERT_HOME/back/speedtest/"                                                        2>&1 >> "$LOG"
-  sudo chmod -R 775 "$PIALERT_HOME/back/speedtest/"                                                             2>&1 >> "$LOG"
-  chmod +x "$PIALERT_HOME/back/shoutrrr/arm64/shoutrrr"                                                         2>&1 >> "$LOG"
-  chmod +x "$PIALERT_HOME/back/shoutrrr/armhf/shoutrrr"                                                         2>&1 >> "$LOG"
-  chmod +x "$PIALERT_HOME/back/shoutrrr/x86/shoutrrr"                                                           2>&1 >> "$LOG"
-
-  print_msg "- Set sudoers..."
-  sudo $PIALERT_HOME/back/pialert-cli set_sudoers                                                               2>&1 >> "$LOG"
+  # sudo chgrp -R www-data "$PIALERT_SATELLITE_HOME/config"                                                                 2>&1 >> "$LOG"
+  # sudo chmod -R 775 "$PIALERT_SATELLITE_HOME/config"                                                                      2>&1 >> "$LOG"
 
 }
 
 # ------------------------------------------------------------------------------
 # Check Pi.Alert Installation Path
 # ------------------------------------------------------------------------------
-check_pialert_home() {
+check_pialert_satellite_home() {
   mkdir -p "$INSTALL_DIR"
   if [ ! -d "$INSTALL_DIR" ] ; then
     process_error "Installation path does not exists: $INSTALL_DIR"
   fi
 
-  if [ -e "$PIALERT_HOME" ] || [ -L "$PIALERT_HOME" ] ; then
-    process_error "Pi.Alert path already exists: $PIALERT_HOME"
+  if [ -e "$PIALERT_SATELLITE_HOME" ] || [ -L "$PIALERT_SATELLITE_HOME" ] ; then
+    process_error "Pi.Alert Satellite path already exists: $PIALERT_SATELLITE_HOME"
   fi
   sudo apt-get install cron whiptail -y
 }
@@ -330,9 +284,9 @@ install_dependencies() {
 # Move Logfile
 # ------------------------------------------------------------------------------
 move_logfile() {
-  NEWLOG="$PIALERT_HOME/log/$LOG"
+  NEWLOG="$PIALERT_SATELLITE_HOME/log/$LOG"
 
-  mkdir -p "$PIALERT_HOME/log"
+  mkdir -p "$PIALERT_SATELLITE_HOME/log"
   mv $LOG $NEWLOG
 
   LOG="$NEWLOG"
