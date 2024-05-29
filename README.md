@@ -15,6 +15,6 @@ The API receives the data and checks whether it is a valid token. If this is the
 ### The Pi.Alert backend:
 If data import for satellites is activated, the backend checks whether satellite scans are available during a scan cycle. The IDs can be compared again using the file name and within the json. The data is then entered in the “CurrentScan” table and the data is processed as usual.
 
-### The Pi.Alert Frontend:
+### The Pi.Alert frontend:
 A satellite is created here. The frontend returns both a generated password and the satellite ID. If necessary, a filter could also be created to filter the devices according to the satellite 
 
