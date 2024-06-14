@@ -17,11 +17,11 @@ $statellite_list[1]['sat_password'] = 'password2';
 # End
 # ============================================================================
 
-$incomming_token = $_REQUEST['TOKEN'];
+$incomming_token = $_REQUEST['token'];
 $satellites_tokes = array($statellite_list[0]['sat_token'], $statellite_list[1]['sat_token']);
 $satellites_passwords = array($statellite_list[0]['sat_password'], $statellite_list[1]['sat_password']);
 
-if (in_array($incomming_token, $satellites_tokes) && isset($_FILES['encrypted_data'])) {
+if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes) && isset($_FILES['encrypted_data'])) {
 
     $file = $_FILES['encrypted_data'];
 
@@ -62,7 +62,21 @@ if (in_array($incomming_token, $satellites_tokes) && isset($_FILES['encrypted_da
 	$response = array("message" => "Okay");
 	echo json_encode($response);
 
-} else {
+} elseif ($_REQUEST['mode'] == "proxy") {
+    $file = $_FILES['encrypted_data'];
+
+    $filename = 'encrypted_'.$incomming_token;
+    $tempPath = $file['tmp_name'];
+    $destinationPath = __DIR__ . '/../satellites/'. $filename;
+
+    move_uploaded_file($tempPath, $destinationPath);
+
+	header('Content-Type: application/json');
+	$response = array("message" => "Proxy Okay");
+	echo json_encode($response);
+
+} 
+else {
 	header('Content-Type: application/json');
 	$response = array("message" => "Error");
 	echo json_encode($response);

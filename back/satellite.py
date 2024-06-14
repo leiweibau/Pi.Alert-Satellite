@@ -226,7 +226,7 @@ def scan_network():
     # Load current scan data 2/2
     print('    Create json of scanned devices')
     jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
-    print('    Encrypt data and transmit to Master')
+    print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
 
     return 0
@@ -510,6 +510,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 #-------------------------------------------------------------------------------
 def encrypt_submit_scandata(json_data):
 
+    if PROXY_MODE:
+        print('    Proxy-Mode enabled')
+
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Convert the dictionary to JSON and then to binary data
@@ -532,10 +535,17 @@ def encrypt_submit_scandata(json_data):
     with open("encrypted_scandata", "rb") as f:
         encrypted_data = f.read()
 
+    if PROXY_MODE:
     # The data for the API requeste
-    post_data = {
-        "TOKEN": SATELLITE_TOKEN
-    }
+        post_data = {
+            "token": SATELLITE_TOKEN,
+            "mode" : "proxy"
+        }
+    else:
+        # The data for the API requeste
+        post_data = {
+            "TOKEN": SATELLITE_TOKEN
+        }
     # Files for the API request
     files = {
         "encrypted_data": ("encrypted_scandata", encrypted_data)
