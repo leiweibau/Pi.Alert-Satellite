@@ -2,9 +2,11 @@
 
 - Web server with PHP support
 - Web server must support file upload
+- The web server must be accessible for both the satellite and the Pi.Alert instance itself
 
 ## Installation:
 
+This step only needs to be performed once and can be used for multiple satellites.
 Create a new folder for the Pi.Alert API Proxy on your web server within the web root (it can also be a subfolder). For the purposes of this guide, I will use the folder "pialert_proxy". Place the "api" folder and its contents into this directory. Additionally, create the "satellites" folder.
 The resulting folder structure should be as follows:
 
