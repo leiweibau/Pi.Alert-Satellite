@@ -22,7 +22,8 @@ $satellites_tokes = array($statellite_list[0]['sat_token'], $statellite_list[1][
 $satellites_passwords = array($statellite_list[0]['sat_password'], $statellite_list[1]['sat_password']);
 
 if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes) && isset($_FILES['encrypted_data'])) {
-
+	# decrypting in non proxy mode
+	# API runs on Pi.Alert
     $file = $_FILES['encrypted_data'];
 
     $filename = 'encrypted_'.$incomming_token;
@@ -32,7 +33,7 @@ if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes
     move_uploaded_file($tempPath, $destinationPath);
 
 	$key = array_search ($incomming_token, $satellites_tokes);
-	$password = $satellites_passwords[$key];  // Hier das tatsächliche Passwort einfügen
+	$password = $satellites_passwords[$key];  // Get password from token id
 
 	$openssl_command = sprintf(
 	    'openssl enc -d -aes-256-cbc -in '.$destinationPath.' -pbkdf2 -pass pass:%s',
@@ -63,6 +64,8 @@ if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes
 	echo json_encode($response);
 
 } elseif ($_REQUEST['mode'] == "proxy") {
+	# No decrypting in proxy mode
+	# API runs on third party webserver 
     $file = $_FILES['encrypted_data'];
 
     $filename = 'encrypted_'.$incomming_token;
@@ -71,15 +74,23 @@ if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes
 
     move_uploaded_file($tempPath, $destinationPath);
 
+    if (!file_exists($destinationPath)) {
+		header('Content-Type: application/json');
+		$response = array("message" => "File was not received");
+		echo json_encode($response);
+		exit();
+    }
+
 	header('Content-Type: application/json');
-	$response = array("message" => "Proxy Okay");
+	$response = array("message" => "File was received by proxy");
 	echo json_encode($response);
 
 } 
 else {
-	header('Content-Type: application/json');
-	$response = array("message" => "Error");
-	echo json_encode($response);
+	header('HTTP/1.0 404 Not Found');
+	// header('Content-Type: application/json');
+	// $response = array("message" => "Error");
+	// echo json_encode($response);
 }
 
 ?>
