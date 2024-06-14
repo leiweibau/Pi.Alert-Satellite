@@ -544,7 +544,7 @@ def encrypt_submit_scandata(json_data):
     else:
         # The data for the API requeste
         post_data = {
-            "TOKEN": SATELLITE_TOKEN
+            "token": SATELLITE_TOKEN
         }
     # Files for the API request
     files = {
