@@ -1,3 +1,6 @@
+## Use case:
+If it is not desired for security reasons that the Satellite sends the data directly to the Pi.Alert API, a second web server can be used as a "proxy". In this case, the satellite sends the data to the proxy and Pi.Alert retrieves the data from it. The data is not decrypted on the proxy.
+
 ## Requirements:
 
 - Web server with PHP support
