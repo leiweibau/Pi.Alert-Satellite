@@ -24,13 +24,13 @@ $satellites_passwords = array($statellite_list[0]['sat_password'], $statellite_l
 if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes) && isset($_FILES['encrypted_data'])) {
 	# decrypting in non proxy mode
 	# API runs on Pi.Alert
-    $file = $_FILES['encrypted_data'];
+	$file = $_FILES['encrypted_data'];
 
-    $filename = 'encrypted_'.$incomming_token;
-    $tempPath = $file['tmp_name'];
-    $destinationPath = __DIR__ . '/../satellites/'. $filename;
+	$filename = 'encrypted_'.$incomming_token;
+	$tempPath = $file['tmp_name'];
+	$destinationPath = __DIR__ . '/../satellites/'. $filename;
 
-    move_uploaded_file($tempPath, $destinationPath);
+	move_uploaded_file($tempPath, $destinationPath);
 
 	$key = array_search ($incomming_token, $satellites_tokes);
 	$password = $satellites_passwords[$key];  // Get password from token id
@@ -66,25 +66,24 @@ if ($_REQUEST['mode'] != "proxy" && in_array($incomming_token, $satellites_tokes
 } elseif ($_REQUEST['mode'] == "proxy") {
 	# No decrypting in proxy mode
 	# API runs on third party webserver 
-    $file = $_FILES['encrypted_data'];
+	$file = $_FILES['encrypted_data'];
 
-    $filename = 'encrypted_'.$incomming_token;
-    $tempPath = $file['tmp_name'];
-    $destinationPath = __DIR__ . '/../satellites/'. $filename;
+	$filename = 'encrypted_'.$incomming_token;
+	$tempPath = $file['tmp_name'];
+	$destinationPath = __DIR__ . '/../satellites/'. $filename;
 
-    move_uploaded_file($tempPath, $destinationPath);
+	move_uploaded_file($tempPath, $destinationPath);
 
-    if (!file_exists($destinationPath)) {
+	if (!file_exists($destinationPath)) {
 		header('Content-Type: application/json');
 		$response = array("message" => "File was not received");
 		echo json_encode($response);
 		exit();
-    }
+	}
 
 	header('Content-Type: application/json');
 	$response = array("message" => "File was received by proxy");
 	echo json_encode($response);
-
 } 
 else {
 	header('HTTP/1.0 404 Not Found');
