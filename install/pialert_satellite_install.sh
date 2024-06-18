@@ -147,7 +147,6 @@ install_pialert_satellite() {
   configure_pialert
   test_pialert_satellite
   add_jobs_to_crontab
-  # publish_pialert
 }
 
 # ------------------------------------------------------------------------------
@@ -238,22 +237,6 @@ add_jobs_to_crontab() {
 }
 
 # ------------------------------------------------------------------------------
-# Publish Pi.Alert web
-# ------------------------------------------------------------------------------
-publish_pialert() {
-  if [ -e "$WEBROOT/pialert" ] || [ -L "$WEBROOT/pialert" ] ; then
-    print_msg "- Deleting previous Pi.Alert site"
-    sudo rm -r "$WEBROOT/pialert"                                                                               2>&1 >> "$LOG"
-  fi
-
-  print_msg "- Setting permissions..."
-  chmod go+x $INSTALL_DIR
-  # sudo chgrp -R www-data "$PIALERT_SATELLITE_HOME/config"                                                                 2>&1 >> "$LOG"
-  # sudo chmod -R 775 "$PIALERT_SATELLITE_HOME/config"                                                                      2>&1 >> "$LOG"
-
-}
-
-# ------------------------------------------------------------------------------
 # Check Pi.Alert Installation Path
 # ------------------------------------------------------------------------------
 check_pialert_satellite_home() {
@@ -331,7 +314,7 @@ process_error() {
   log ""
   log "************************************************************"
   log "************************************************************"
-  log "**            ERROR INSTALLING PI.ALERT                   **"
+  log "**          ERROR INSTALLING PI.ALERT SATELLITE           **"
   log "************************************************************"
   log "************************************************************"
   log ""
