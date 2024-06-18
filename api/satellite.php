@@ -113,26 +113,44 @@ if ($_REQUEST['mode'] != "proxy") {
 	}
 
 } else {
-	# No decrypting in proxy mode
-	# API runs on third party webserver 
-	$file = $_FILES['encrypted_data'];
 
-	$filename = 'encrypted_'.$incomming_token;
-	$tempPath = $file['tmp_name'];
-	$destinationPath = __DIR__ . '/../satellites/'. $filename;
-
-	move_uploaded_file($tempPath, $destinationPath);
-
-	if (!file_exists($destinationPath)) {
+    if (!file_exists('config.php')) {
 		header('Content-Type: application/json');
-		$response = array("message" => "File was not received");
+		$response = array("message" => "Configfile not found");
 		echo json_encode($response);
-		die();
+    	die();
+    }
+
+    require 'config.php';
+
+	if (in_array($incomming_token, $valid_tokens) && isset($_FILES['encrypted_data'])) {
+
+		# No decrypting in proxy mode
+		# API runs on third party webserver 
+		$file = $_FILES['encrypted_data'];
+
+		$filename = 'encrypted_'.$incomming_token;
+		$tempPath = $file['tmp_name'];
+		$destinationPath = __DIR__ . '/../satellites/'. $filename;
+
+		move_uploaded_file($tempPath, $destinationPath);
+
+		if (!file_exists($destinationPath)) {
+			header('Content-Type: application/json');
+			$response = array("message" => "File was not received");
+			echo json_encode($response);
+			die();
+		}
+
+		header('Content-Type: application/json');
+		$response = array("message" => "File was received by proxy");
+		echo json_encode($response);
+	} else {
+		header('Content-Type: application/json');
+		$response = array("message" => "Invalid Satellite ID");
+		echo json_encode($response);
 	}
 
-	header('Content-Type: application/json');
-	$response = array("message" => "File was received by proxy");
-	echo json_encode($response);
 } 
 
 
