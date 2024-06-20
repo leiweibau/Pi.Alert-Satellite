@@ -535,17 +535,13 @@ def encrypt_submit_scandata(json_data):
     with open("encrypted_scandata", "rb") as f:
         encrypted_data = f.read()
 
-    if PROXY_MODE:
+    transfer_mode = "proxy" if PROXY_MODE else "direct"
+
     # The data for the API requeste
-        post_data = {
-            "token": SATELLITE_TOKEN,
-            "mode" : "proxy"
-        }
-    else:
-        # The data for the API requeste
-        post_data = {
-            "token": SATELLITE_TOKEN
-        }
+    post_data = {
+        "token": SATELLITE_TOKEN,
+        "mode" : transfer_mode
+    }
     # Files for the API request
     files = {
         "encrypted_data": ("encrypted_scandata", encrypted_data)
