@@ -210,12 +210,6 @@ test_pialert_satellite() {
 
   print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
   stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py update_vendors_silent            2>&1 | tee -ai "$LOG"
-
-  echo ""
-  print_msg "- Testing Pi.Alert Network scan..."
-  # print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
-  # stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py scan                             2>&1 | tee -ai "$LOG"
-
 }
 
 # ------------------------------------------------------------------------------
