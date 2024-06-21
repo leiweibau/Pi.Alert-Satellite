@@ -19,6 +19,7 @@ The resulting folder structure should be as follows:
 ```
 pialert_proxy
 ├── api
+├───── satellite.php
 └── satellites
 ```
 
@@ -29,3 +30,11 @@ In the configuration file of the satellite ("config/satellite.conf"), the variab
 as the value for the variable "SATELLITE_MASTER_URL" according to the example above. Finally, a file called "config.php", which can be downloaded from 
 the Pi.Alert satellite settings, is also copied to the "api" directory. This file contains the tokens of all created satellites and ensures that only 
 valid satellites are allowed to interact with the API.
+
+```
+pialert_proxy
+├── api
+├───── satellite.php
+├───── config.php
+└── satellites
+```

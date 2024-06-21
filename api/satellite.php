@@ -171,14 +171,17 @@ if ($_REQUEST['mode'] == "direct") {
 	$directory = '../satellites';
 	$sat_enc_result = $directory . '/encrypted_'. $incomming_token;
 
-header('Content-Description: File Transfer');
-header('Content-Type: application/octet-stream');
-header('Content-Disposition: attachment; filename="encrypted_' . $incomming_token . '"');
-header('Expires: 0');
-header('Cache-Control: must-revalidate');
-header('Pragma: public');
-header('Content-Length: ' . filesize($sat_enc_result));
-readfile($sat_enc_result);
-
+	if (file_exists($sat_enc_result)) {
+		header('Content-Description: File Transfer');
+		header('Content-Type: application/octet-stream');
+		header('Content-Disposition: attachment; filename="encrypted_' . $incomming_token . '"');
+		header('Expires: 0');
+		header('Cache-Control: must-revalidate');
+		header('Pragma: public');
+		header('Content-Length: ' . filesize($sat_enc_result));
+		readfile($sat_enc_result);
+	} else {
+		header('HTTP/1.0 404 Not Found', true, 404);
+	}
 }
 ?>
