@@ -38,3 +38,9 @@ pialert_proxy
 ├───── config.php
 └── satellites
 ```
+
+## Additional information
+
+The specification of a token and the mode used is mandatory for the API. If this is not the case, it outputs an HTTP status code 404 including a 
+corresponding error page. All other states are "answered" in the form of a JSON message when using the "proxy" and "direct" modes. The "get" mode is 
+used to download the files and has the additional function of deleting all scan results on the proxy that are older than 10 minutes.
