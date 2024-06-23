@@ -43,4 +43,6 @@ pialert_proxy
 
 The specification of a token and the mode used is mandatory for the API. If this is not the case, it outputs an HTTP status code 404 including a 
 corresponding error page. All other states are "answered" in the form of a JSON message when using the "proxy" and "direct" modes. The "get" mode is 
-used to download the files and has the additional function of deleting all scan results on the proxy that are older than 10 minutes.
+used to download the files and has the additional function of deleting all scan results on the proxy that are older than 10 minutes. The reason for this 
+is that if the satellite or the Internet connection from the satellite fails, the last available scan is not constantly loaded, making it appear as if 
+everything is OK. By deleting the old scans, the satellite and all connected devices are displayed as offline.
