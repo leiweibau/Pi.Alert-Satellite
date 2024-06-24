@@ -453,7 +453,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname'],
+                    'cur_hostname': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'Fritzbox',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -466,7 +466,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname'],
+                    'cur_hostname': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'Mikrotik',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -479,7 +479,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname'],
+                    'cur_hostname': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'UniFi',
                     'cur_SatelliteID': SATELLITE_TOKEN
