@@ -422,9 +422,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     all_devices = []
 
-    if bool(p_internet_detection) and INTERNET_DETECTION:
+    if bool(p_internet_detection):
         for device in p_internet_detection:
-            if len(device['mac']) < 12:
+            if len(device['mac']) > 12:
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
@@ -436,7 +436,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
-            if len(device['mac']) < 12:
+            if len(device['mac']) > 12:
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
@@ -449,7 +449,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     if bool(p_fritzbox_network):
         for device in p_fritzbox_network:
-            if len(device['mac']) < 12:
+            if len(device['mac']) > 12:
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
@@ -462,7 +462,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     if bool(p_mikrotik_network):
         for device in p_mikrotik_network:
-            if len(device['mac']) < 12:
+            if len(device['mac']) > 12:
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
@@ -475,7 +475,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     if bool(p_unifi_network):
         for device in p_unifi_network:
-            if len(device['mac']) < 12:
+            if len(device['mac']) > 12:
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
