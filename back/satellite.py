@@ -307,9 +307,8 @@ def read_fritzbox_active_hosts():
 
     from fritzconnection.lib.fritzhosts import FritzHosts
 
-    fritzbox_network = []
-
     # copy Fritzbox Network list
+    fritzbox_network = []
     fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
     hosts = fh.get_hosts_info()
     for index, host in enumerate(hosts, start=1):
@@ -322,11 +321,11 @@ def read_fritzbox_active_hosts():
                 vendor = MacLookup().lookup(host['mac'])
             except:
                 vendor = "Prefix is not registered"
-            
+
             fritzbox_scan = {
                 "mac": mac,
                 "ip": ip,
-                "name": hostname,
+                "hostname": hostname,
                 "vendor": vendor
             }
             fritzbox_network.append(fritzbox_scan)
@@ -441,6 +440,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
+                    'cur_hostname': '(satellite network client)',
                     'cur_Vendor': device['hw'],
                     'cur_ScanMethod': 'arp-scan',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -453,7 +453,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname']
+                    'cur_hostame': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'Fritzbox',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -466,7 +466,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname']
+                    'cur_hostame': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'Mikrotik',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -479,7 +479,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostame': device['hostname']
+                    'cur_hostame': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'UniFi',
                     'cur_SatelliteID': SATELLITE_TOKEN
