@@ -423,60 +423,68 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     all_devices = []
 
-    if bool(p_internet_detection):
+    if bool(p_internet_detection) and INTERNET_DETECTION:
         for device in p_internet_detection:
-            device_data = {
-                'cur_MAC': device['mac'],
-                'cur_IP': "",
-                'cur_Vendor': "",
-                'cur_ScanMethod': 'Internet Check',
-                'cur_SatelliteID': SATELLITE_TOKEN
-            }
-            all_devices.append(device_data)
+            if len(device['mac']) < 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_Vendor': "",
+                    'cur_ScanMethod': 'Internet Check',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
-            device_data = {
-                'cur_MAC': device['mac'],
-                'cur_IP': device['ip'],
-                'cur_Vendor': device['hw'],
-                'cur_ScanMethod': 'arp-scan',
-                'cur_SatelliteID': SATELLITE_TOKEN
-            }
-            all_devices.append(device_data)
+            if len(device['mac']) < 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_Vendor': device['hw'],
+                    'cur_ScanMethod': 'arp-scan',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     if bool(p_fritzbox_network):
         for device in p_fritzbox_network:
-            device_data = {
-                'cur_MAC': device['mac'],
-                'cur_IP': device['ip'],
-                'cur_Vendor': device['vendor'],
-                'cur_ScanMethod': 'Fritzbox',
-                'cur_SatelliteID': SATELLITE_TOKEN
-            }
-            all_devices.append(device_data)
+            if len(device['mac']) < 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostame': device['hostname']
+                    'cur_Vendor': device['vendor'],
+                    'cur_ScanMethod': 'Fritzbox',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     if bool(p_mikrotik_network):
         for device in p_mikrotik_network:
-            device_data = {
-                'cur_MAC': device['mac'],
-                'cur_IP': device['ip'],
-                'cur_Vendor': device['vendor'],
-                'cur_ScanMethod': 'Mikrotik',
-                'cur_SatelliteID': SATELLITE_TOKEN
-            }
-            all_devices.append(device_data)
+            if len(device['mac']) < 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostame': device['hostname']
+                    'cur_Vendor': device['vendor'],
+                    'cur_ScanMethod': 'Mikrotik',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     if bool(p_unifi_network):
         for device in p_unifi_network:
-            device_data = {
-                'cur_MAC': device['mac'],
-                'cur_IP': device['ip'],
-                'cur_Vendor': device['vendor'],
-                'cur_ScanMethod': 'UniFi',
-                'cur_SatelliteID': SATELLITE_TOKEN
-            }
-            all_devices.append(device_data)
+            if len(device['mac']) < 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostame': device['hostname']
+                    'cur_Vendor': device['vendor'],
+                    'cur_ScanMethod': 'UniFi',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     # Get Satellite MAC
     local_mac_cmd = ["/sbin/ifconfig `ip -o route get 1 | sed 's/^.*dev \\([^ ]*\\).*$/\\1/;q'` | grep ether | awk '{print $2}'"]
