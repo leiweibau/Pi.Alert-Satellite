@@ -128,7 +128,6 @@ update_config() {
 # Test Pi.Alert-Satellite
 # ------------------------------------------------------------------------------
 test_pialert() {
-  echo ""
   print_msg "- Testing Pi.Alert-Satellite Network scan..."
   stdbuf -i0 -o0 -e0 $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py scan                      2>&1 | tee -ai "$LOG"
 }
