@@ -60,7 +60,6 @@ create_backup() {
   print_msg "- Creating new Pi.Alert backup..."
   cd "$INSTALL_DIR"
   tar cvf "$INSTALL_DIR"/satellite_update_backup_`date +"%Y-%m-%d_%H-%M"`.tar pialert_satellite --checkpoint=100 --checkpoint-action="ttyout=."     2>&1 >> "$LOG"
-  echo ""
 }
 
 # ------------------------------------------------------------------------------
@@ -90,7 +89,8 @@ download_pialert_satellite() {
     rm -rf "$HOME/Pi.Alert-Satellite"
   fi
 
-  git clone https://github.com/leiweibau/Pi.Alert-Satellite                       2>&1 >> "$LOG"
+  Clone_Update=`(git clone --quiet https://github.com/leiweibau/Pi.Alert-Satellite) 2>&1 >> "$LOG"`
+  #git clone --quiet https://github.com/leiweibau/Pi.Alert-Satellite                       2>&1 >> "$LOG"
   cp -rf "$HOME/Pi.Alert-Satellite/back" "$PIALERT_SATELLITE_HOME/"
   cp -rf "$HOME/Pi.Alert-Satellite/api/satellite.php" "$PIALERT_SATELLITE_HOME/api/satellite.php"
   cp -rf "$HOME/Pi.Alert-Satellite/config/version.conf" "$PIALERT_SATELLITE_HOME/config/version.conf"
