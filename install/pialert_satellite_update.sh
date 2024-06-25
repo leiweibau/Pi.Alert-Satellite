@@ -26,7 +26,7 @@ PYTHON_BIN=python3
 # Main
 # ------------------------------------------------------------------------------
 main() {
-  print_superheader "Pi.Alert Update"
+  print_superheader "Pi.Alert Satellite Update"
   log "`date`"
   log "Logfile: $LOG"
   log ""
@@ -128,7 +128,7 @@ update_config() {
 test_pialert() {
   echo ""
   print_msg "- Testing Pi.Alert-Satellite Network scan..."
-  stdbuf -i0 -o0 -e0 $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/sattellite.py scan                      2>&1 | tee -ai "$LOG"
+  stdbuf -i0 -o0 -e0 $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py scan                      2>&1 | tee -ai "$LOG"
 }
 
 # ------------------------------------------------------------------------------
