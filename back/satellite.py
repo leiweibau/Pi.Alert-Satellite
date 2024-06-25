@@ -526,7 +526,7 @@ def encrypt_submit_scandata(json_data):
 
     # OpenSSL command for encrypting the data
     openssl_command = [
-        "openssl", "enc", "-aes-256-cbc", "-salt", "-out", "encrypted_scandata", "-pbkdf2",
+        "openssl", "enc", "-aes-256-cbc", "-salt", "-out", SATELLITE_BACK_PATH + "encrypted_scandata", "-pbkdf2",
         "-pass", "pass:{}".format(SATELLITE_PASSWORD)
     ]
 
@@ -538,7 +538,7 @@ def encrypt_submit_scandata(json_data):
     #     json.dump(json_data, outfile, indent=4)
 
     # Read the encrypted data from the file
-    with open("encrypted_scandata", "rb") as f:
+    with open(SATELLITE_BACK_PATH + "encrypted_scandata", "rb") as f:
         encrypted_data = f.read()
 
     transfer_mode = "proxy" if PROXY_MODE else "direct"
