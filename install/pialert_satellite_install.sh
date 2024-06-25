@@ -11,13 +11,12 @@
 # ------------------------------------------------------------------------------
 # Variables
 # ------------------------------------------------------------------------------
-  COLS=70
-  ROWS=12
-  
+  SAT_TOKEN=$1
+  SAT_PASSWORD=$2
+
   INSTALL_DIR=~
   PIALERT_SATELLITE_HOME="$INSTALL_DIR/pialert_satellite"
 
-  
   LOG="satellite_install_`date +"%Y-%m-%d_%H-%M"`.log"
   
   # MAIN_IP=`ip -o route get 1 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'`
@@ -57,9 +56,14 @@ install_additional_dependencies() {
   print_header "arp-scan, dnsutils and nmap"
 
   print_msg "- Installing arp-scan..."
-  sudo apt-get install arp-scan -y                                          2>&1 >> "$LOG"
-  sudo mkdir -p /usr/share/ieee-data                                        2>&1 >> "$LOG"
-
+  sudo apt-get install arp-scan -y                                                    2>&1 >> "$LOG"
+  sudo mkdir -p /usr/share/ieee-data                                                  2>&1 >> "$LOG"
+  if [ -f "/usr/share/arp-scan/ieee-iab.txt.bak" ]; then
+      sudo mv /usr/share/arp-scan/ieee-iab.txt.bak /usr/share/arp-scan/ieee-iab.txt   2>&1 >> "$LOG"
+  fi
+  if [ -d "/usr/share/arp-scan/2_backup" ]; then
+      sudo rm -rf /usr/share/arp-scan/2_backup                                        2>&1 >> "$LOG"
+  fi
   print_msg "- Testing arp-scan..."
   sudo arp-scan -l | head -n -3 | tail +3 | tee -a "$LOG"
 
@@ -179,6 +183,14 @@ download_pialert() {
 configure_pialert() {
   print_msg "- Setting Pi.Alert config file"
 
+  if [ -n "$SAT_TOKEN" ]; then
+      set_pialert_parameter SATELLITE_TOKEN    "'$SAT_TOKEN'"
+  fi
+
+  if [ -n "$SAT_PASSWORD" ]; then
+      set_pialert_parameter SATELLITE_PASSWORD    "'$SAT_PASSWORD'"
+  fi
+
   set_pialert_parameter SATELLITE_PATH    "'$PIALERT_SATELLITE_HOME'"
 
 }
@@ -195,7 +207,7 @@ set_pialert_parameter() {
     VALUE="$2"
   fi
   
-  sed -i "/^$1.*=/s|=.*|= $VALUE|" $PIALERT_SATELLITE_HOME/config/satellite.conf                             2>&1 >> "$LOG"
+  sed -i "/^$1.*=/s|=.*|= $VALUE|" $PIALERT_SATELLITE_HOME/config/satellite.conf                          2>&1 >> "$LOG"
 }
 
 # ------------------------------------------------------------------------------
@@ -205,11 +217,10 @@ test_pialert_satellite() {
   print_msg "- Testing Pi.Alert HW vendors database update process..."
   print_msg "- Prepare directories..."
   if [ ! -e /var/lib/ieee-data ]; then
-    sudo ln -s /usr/share/ieee-data/ /var/lib/ieee-data                                          2>&1 >> "$LOG"
+    sudo ln -s /usr/share/ieee-data/ /var/lib/ieee-data                                                   2>&1 >> "$LOG"
   fi
 
-  print_msg "*** PLEASE WAIT A COUPLE OF MINUTES..."
-  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py update_vendors_silent            2>&1 | tee -ai "$LOG"
+  stdbuf -i0 -o0 -e0  $PYTHON_BIN $PIALERT_SATELLITE_HOME/back/satellite.py update_vendors_silent         2>&1 | tee -ai "$LOG"
 }
 
 # ------------------------------------------------------------------------------
@@ -223,9 +234,6 @@ add_jobs_to_crontab() {
   fi
 
   print_msg "- Adding jobs to the crontab..."
-  # if [ $USE_PYTHON_VERSION -eq 3 ] ; then
-  #   sed -i "s/\<python\>/$PYTHON_BIN/g" $PIALERT_SATELLITE_HOME/install/pialert.cron
-  # fi
 
   (crontab -l 2>/dev/null || : ; cat $PIALERT_SATELLITE_HOME/install/satellite.cron) | crontab -
 }
