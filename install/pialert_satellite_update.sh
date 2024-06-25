@@ -35,9 +35,7 @@ main() {
 
   check_pialert_home
   check_python_version
-
   create_backup
-
   check_packages
   download_pialert_satellite
   update_config
