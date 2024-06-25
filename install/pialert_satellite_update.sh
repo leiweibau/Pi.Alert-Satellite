@@ -18,7 +18,7 @@ else
   INSTALL_DIR="$HOME"
 fi
 PIALERT_SATELLITE_HOME="$INSTALL_DIR/pialert_satellite"
-LOG="pialert_update_`date +"%Y-%m-%d_%H-%M"`.log"
+LOG="pialert_satellite_update_`date +"%Y-%m-%d_%H-%M"`.log"
 PYTHON_BIN=python3
 
 
@@ -68,7 +68,7 @@ create_backup() {
 # ------------------------------------------------------------------------------
 check_packages() {
   sudo apt-get update 2>&1 >>"$LOG"
-  packages=("apt-utils" "git" "dnsutils" "net-tools" "nbtscan" "avahi-utils" "php-curl" "php-xml" "python3-requests" "python3-cryptography" "libwww-perl" "mmdb-bin" "libtext-csv-perl" "aria2")
+  packages=("apt-utils" "git" "dnsutils" "net-tools" "nbtscan" "avahi-utils" "python3-requests" "python3-cryptography" "libwww-perl" "mmdb-bin" "libtext-csv-perl" "aria2")
   print_msg "- Checking packages..."
   missing_packages=()
   for package in "${packages[@]}"; do
@@ -86,6 +86,10 @@ check_packages() {
 # Download and uncompress Pi.Alert
 # ------------------------------------------------------------------------------
 download_pialert_satellite() {
+  if [ -e "$HOME/Pi.Alert-Satellite" ] ; then
+    rm -rf "$HOME/Pi.Alert-Satellite"
+  fi
+
   git clone https://github.com/leiweibau/Pi.Alert-Satellite                       2>&1 >> "$LOG"
   cp -rf "$HOME/Pi.Alert-Satellite/back" "$PIALERT_SATELLITE_HOME/"
   cp -rf "$HOME/Pi.Alert-Satellite/api/satellite.php" "$PIALERT_SATELLITE_HOME/api/satellite.php"
