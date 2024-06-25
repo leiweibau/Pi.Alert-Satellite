@@ -98,6 +98,8 @@ download_pialert_satellite() {
   cp -rf "$HOME/Pi.Alert-Satellite/docs" "$PIALERT_SATELLITE_HOME/"
   cp -rf "$HOME/Pi.Alert-Satellite/install" "$PIALERT_SATELLITE_HOME/"
   cp -rf "$HOME/Pi.Alert-Satellite/README.md" "$PIALERT_SATELLITE_HOME/"
+
+  rm -rf "$HOME/Pi.Alert-Satellite"
 }
 
 # ------------------------------------------------------------------------------
