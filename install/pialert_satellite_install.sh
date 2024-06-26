@@ -1,11 +1,9 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
-#  Pi.Alert
-#  Open Source Network Guard / WIFI & LAN intrusion detector 
-#
-#  pialert_install.sh - Installation script
+#  pialert_satellite_install.sh - Installation script
 # ------------------------------------------------------------------------------
 #  Puche 2021        pi.alert.application@gmail.com        GNU GPLv3
+#  leiweibau 2024                                          GNU GPLv3
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
@@ -16,15 +14,10 @@
 
   INSTALL_DIR=~
   PIALERT_SATELLITE_HOME="$INSTALL_DIR/pialert_satellite"
-
   LOG="satellite_install_`date +"%Y-%m-%d_%H-%M"`.log"
-  
-  # MAIN_IP=`ip -o route get 1 | sed -n 's/.*src \([0-9.]\+\).*/\1/p'`
-  MAIN_IP=`ip -o route get 1 | sed 's/^.*src \([^ ]*\).*$/\1/;q'`
   
   USE_PYTHON_VERSION=0
   PYTHON_BIN=python
-
 
 # ------------------------------------------------------------------------------
 # Main

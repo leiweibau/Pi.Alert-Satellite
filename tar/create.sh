@@ -3,7 +3,7 @@
 PIALERT_DEV_PATH=../../
 cd $PIALERT_DEV_PATH
 pwd
-PIALERT_VERSION=`awk '$1=="VERSION" { print $3 }' pialert/config/version.conf | tr -d \'`
+PIALERT_VERSION=`awk '$1=="VERSION" { print $3 }' pialert_satellite/config/version.conf | tr -d \'`
 
 # ------------------------------------------------------------------------------
 ls -l pialert_satellite/tar/pialert_satellite*.tar

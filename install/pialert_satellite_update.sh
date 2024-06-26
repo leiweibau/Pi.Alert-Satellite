@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------------------------
-#  Pi.Alert
-#  Open Source Network Guard / WIFI & LAN intrusion detector 
-#
-#  pialert_update.sh - Update script
+#  pialert_satellite_update.sh - Update script
 # ------------------------------------------------------------------------------
 #  Puche 2021        pi.alert.application@gmail.com        GNU GPLv3
 #  leiweibau 2023                                          GNU GPLv3
