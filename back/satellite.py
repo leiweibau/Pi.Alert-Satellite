@@ -421,7 +421,7 @@ def read_unifi_clients():
 def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
 
     all_devices = []
-
+    # Internet Check
     if bool(p_internet_detection):
         for device in p_internet_detection:
             if len(device['mac']) > 12:
@@ -433,20 +433,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
-
-    if bool(p_arpscan_devices):
-        for device in p_arpscan_devices:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': '(satellite network client)',
-                    'cur_Vendor': device['hw'],
-                    'cur_ScanMethod': 'arp-scan',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
-
+    # Fritz!Box
     if bool(p_fritzbox_network):
         for device in p_fritzbox_network:
             if len(device['mac']) > 12:
@@ -459,7 +446,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
-
+    # Mikrotik
     if bool(p_mikrotik_network):
         for device in p_mikrotik_network:
             if len(device['mac']) > 12:
@@ -472,7 +459,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
-
+    # UniFi
     if bool(p_unifi_network):
         for device in p_unifi_network:
             if len(device['mac']) > 12:
@@ -482,6 +469,19 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_hostname': device['hostname'],
                     'cur_Vendor': device['vendor'],
                     'cur_ScanMethod': 'UniFi',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
+    # Arpscan
+    if bool(p_arpscan_devices):
+        for device in p_arpscan_devices:
+            if len(device['mac']) > 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostname': '(satellite network client)',
+                    'cur_Vendor': device['hw'],
+                    'cur_ScanMethod': 'arp-scan',
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
