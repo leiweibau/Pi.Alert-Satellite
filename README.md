@@ -9,8 +9,7 @@ Here the API of the Pi.Alert instance is called. This API compares the transmitt
 #### Indirect API call (proxy mode):
 The API is installed on a separate web server. The satellite now transmits the data to the "proxy". This uses a configuration file to check whether it is a valid token and, if so, stores the data in encrypted form. Decryption on the proxy is not possible, as only the satellite and the Pi.Alert instance know the password. For Pi.Alert to retrieve the data, it must also be configured for proxy mode.
 
-As I am still in the test/trial phase, there are still many things that are not possible. From time to time, the things that work are listed in the commits. 
-The whole thing is still a prototype or feasibility study and there is no guarantee that the work on this will be completed. For this reason, I will not work on any issues that are reported during this prototype phase.
+[Prepare PROXY_MODE](docs/PROXY_MODE.md)
 
 ### Scan Methods
 
