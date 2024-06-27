@@ -11,6 +11,8 @@
 # ------------------------------------------------------------------------------
   SAT_TOKEN=$1
   SAT_PASSWORD=$2
+  SAT_PROXY_MODE=$3
+  SAT_URL=$4
 
   INSTALL_DIR=~
   PIALERT_SATELLITE_HOME="$INSTALL_DIR/pialert_satellite"
@@ -177,14 +179,21 @@ configure_pialert() {
   print_msg "- Setting Pi.Alert config file"
 
   if [ -n "$SAT_TOKEN" ]; then
-      set_pialert_parameter SATELLITE_TOKEN    "'$SAT_TOKEN'"
+      set_pialert_parameter SATELLITE_TOKEN "'$SAT_TOKEN'"
   fi
 
   if [ -n "$SAT_PASSWORD" ]; then
-      set_pialert_parameter SATELLITE_PASSWORD    "'$SAT_PASSWORD'"
+      set_pialert_parameter SATELLITE_PASSWORD "'$SAT_PASSWORD'"
+  fi
+  if [ -n "$SAT_PROXY_MODE" ]; then
+      set_pialert_parameter PROXY_MODE "$SAT_PROXY_MODE"
   fi
 
-  set_pialert_parameter SATELLITE_PATH    "'$PIALERT_SATELLITE_HOME'"
+  if [ -n "$SAT_URL" ]; then
+      set_pialert_parameter SATELLITE_MASTER_URL "'$SAT_URL'"
+  fi
+
+  set_pialert_parameter SATELLITE_PATH "'$PIALERT_SATELLITE_HOME'"
 
 }
 
@@ -220,9 +229,9 @@ test_pialert_satellite() {
 # Add Pi.Alert jobs to crontab
 # ------------------------------------------------------------------------------
 add_jobs_to_crontab() {
-  if crontab -l 2>/dev/null | grep -Fq pialert ; then
+  if crontab -l 2>/dev/null | grep -Fq satellite ; then
     print_msg "- Pi.Alert Satellite crontab jobs already exists. This is your crontab:"
-    crontab -l | grep -F pialert_satellite                                                                 2>&1 | tee -ai "$LOG"
+    crontab -l | grep -F satellite                                                                 2>&1 | tee -ai "$LOG"
     return    
   fi
 
