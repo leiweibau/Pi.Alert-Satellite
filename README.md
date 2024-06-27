@@ -37,6 +37,12 @@ bash -c "$(wget -qLO - https://github.com/leiweibau/Pi.Alert-Satellite/raw/main/
   </tbody>
 </table>
 
+As an alternative to this installation, you can also click on the blue "i" icon on the right in the line of the corresponding satellite in the Pi.Alert instance after creating a satellite and create the 
+installation command, which takes care of the important configuration during the installation.
+
+| ![Config MainScreen][Config] | ![PreConfig Modal][PreConfig] |
+| ---------------------------- | ----------------------------- |
+
 ### Update
 <!--- --------------------------------------------------------------------- --->
 Initially designed to run on a Debian based Linux distribution. 
@@ -54,3 +60,20 @@ bash -c "$(wget -qLO - https://github.com/leiweibau/Pi.Alert-Satellite/raw/main/
   </td></tr>
   </tbody>
 </table>
+
+### Uninstall
+<!--- --------------------------------------------------------------------- --->
+
+In the directory "pialert-satellite/install/" there is a script called "pialert_satellite_uninstall.sh". This can be used to delete the cronjob and the "pialert-satellite" directory.
+
+### License
+  GPL 3.0
+  [Read more here](LICENSE.txt)
+
+### Contact
+
+  leiweibau@gmail.com
+
+
+[Config]:    https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_config.png          "Config MainScreen"
+[PreConfig]: https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_preconfig.png       "PreConfig Modal"
