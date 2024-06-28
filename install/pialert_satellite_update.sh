@@ -34,8 +34,9 @@ main() {
   check_python_version
   create_backup
   check_packages
-  download_pialert_satellite
+  download_satellite
   update_config
+  configure_user
 
   test_pialert
   
@@ -43,6 +44,13 @@ main() {
   print_msg ""
 
   move_logfile
+}
+
+configure_user() {
+  SAT_USER=$(whoami)
+  print_msg "Pi.Alert-Satellite User: $SAT_USER"
+  echo -e "    ...Create Satellite sudoer file to be able to run \"arp-scan\""
+  echo "${SAT_USER} ALL=(ALL) NOPASSWD: /usr/sbin/arp-scan" | sudo tee -a /etc/sudoers.d/pialert-satellite
 }
 
 # ------------------------------------------------------------------------------
@@ -79,7 +87,7 @@ check_packages() {
 # ------------------------------------------------------------------------------
 # Download and uncompress Pi.Alert
 # ------------------------------------------------------------------------------
-download_pialert_satellite() {
+download_satellite() {
   if [ -e "$HOME/Pi.Alert-Satellite" ] ; then
     rm -rf "$HOME/Pi.Alert-Satellite"
   fi

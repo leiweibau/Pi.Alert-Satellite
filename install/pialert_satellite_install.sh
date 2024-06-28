@@ -25,7 +25,7 @@
 # Main
 # ------------------------------------------------------------------------------
 main() {
-  print_superheader "Pi.Alert Satellite Installation"
+  print_superheader "Pi.Alert-Satellite Installation"
   log "`date`"
   log "Logfile: $LOG"
   install_dependencies
@@ -76,7 +76,7 @@ install_additional_dependencies() {
     print_msg "  - Python 3 is available"
     USE_PYTHON_VERSION=3
   elif $PYTHON2 ; then
-    print_msg "  - Python 2 is available but not compatible with Pi.Alert Satellite"
+    print_msg "  - Python 2 is available but not compatible with Pi.Alert-Satellite"
     print_msg "    - Python 3 will be installed"
     USE_PYTHON_VERSION=3
   else
@@ -140,18 +140,19 @@ check_python_versions() {
 # Install Pi.Alert
 # ------------------------------------------------------------------------------
 install_pialert_satellite() {
-  print_header "Pi.Alert Satellite"
+  print_header "Pi.Alert-Satellite"
 
-  download_pialert
-  configure_pialert
-  test_pialert_satellite
+  download_satellite
+  configure_satellite
+  configure_user
+  test_satellite
   add_jobs_to_crontab
 }
 
 # ------------------------------------------------------------------------------
 # Download and uncompress Pi.Alert
 # ------------------------------------------------------------------------------
-download_pialert() {
+download_satellite() {
   if [ -f "$INSTALL_DIR/pialert_satellite_latest.tar" ] ; then
     print_msg "- Deleting previous downloaded tar file"
     rm -r "$INSTALL_DIR/pialert_satellite_latest.tar"
@@ -173,34 +174,44 @@ download_pialert() {
 }
 
 # ------------------------------------------------------------------------------
-# Configure Pi.Alert parameters
+# Configure Pi.Alert-Satellite parameters
 # ------------------------------------------------------------------------------
-configure_pialert() {
-  print_msg "- Setting Pi.Alert config file"
+configure_satellite() {
+  print_msg "- Setting Pi.Alert-Satellite config file"
 
   if [ -n "$SAT_TOKEN" ]; then
-      set_pialert_parameter SATELLITE_TOKEN "'$SAT_TOKEN'"
+      set_satellite_parameter SATELLITE_TOKEN "'$SAT_TOKEN'"
   fi
 
   if [ -n "$SAT_PASSWORD" ]; then
-      set_pialert_parameter SATELLITE_PASSWORD "'$SAT_PASSWORD'"
+      set_satellite_parameter SATELLITE_PASSWORD "'$SAT_PASSWORD'"
   fi
   if [ -n "$SAT_PROXY_MODE" ]; then
-      set_pialert_parameter PROXY_MODE "$SAT_PROXY_MODE"
+      set_satellite_parameter PROXY_MODE "$SAT_PROXY_MODE"
   fi
 
   if [ -n "$SAT_URL" ]; then
-      set_pialert_parameter SATELLITE_MASTER_URL "'$SAT_URL'"
+      set_satellite_parameter SATELLITE_MASTER_URL "'$SAT_URL'"
   fi
 
-  set_pialert_parameter SATELLITE_PATH "'$PIALERT_SATELLITE_HOME'"
+  set_satellite_parameter SATELLITE_PATH "'$PIALERT_SATELLITE_HOME'"
 
 }
 
 # ------------------------------------------------------------------------------
-# Set Pi.Alert parameter
+# Configure User
 # ------------------------------------------------------------------------------
-set_pialert_parameter() {
+configure_user() {
+  SAT_USER=$(whoami)
+  print_msg "Pi.Alert-Satellite User: $SAT_USER"
+  echo -e "    ...Create Satellite sudoer file to be able to run \"arp-scan\""
+  echo "${SAT_USER} ALL=(ALL) NOPASSWD: /usr/sbin/arp-scan" | sudo tee -a /etc/sudoers.d/pialert-satellite
+}
+
+# ------------------------------------------------------------------------------
+# Set Pi.Alert-Satellite parameter
+# ------------------------------------------------------------------------------
+set_satellite_parameter() {
   if [ "$2" = "false" ] ; then
     VALUE="False"
   elif [ "$2" = "true" ] ; then
@@ -215,8 +226,8 @@ set_pialert_parameter() {
 # ------------------------------------------------------------------------------
 # Test Pi.Alert
 # ------------------------------------------------------------------------------
-test_pialert_satellite() {
-  print_msg "- Testing Pi.Alert HW vendors database update process..."
+test_satellite() {
+  print_msg "- Testing Pi.Alert-Satellite HW vendors database update process..."
   print_msg "- Prepare directories..."
   if [ ! -e /var/lib/ieee-data ]; then
     sudo ln -s /usr/share/ieee-data/ /var/lib/ieee-data                                                   2>&1 >> "$LOG"
@@ -226,11 +237,11 @@ test_pialert_satellite() {
 }
 
 # ------------------------------------------------------------------------------
-# Add Pi.Alert jobs to crontab
+# Add Pi.Alert-Satellite jobs to crontab
 # ------------------------------------------------------------------------------
 add_jobs_to_crontab() {
   if crontab -l 2>/dev/null | grep -Fq satellite ; then
-    print_msg "- Pi.Alert Satellite crontab jobs already exists. This is your crontab:"
+    print_msg "- Pi.Alert-Satellite crontab jobs already exists. This is your crontab:"
     crontab -l | grep -F satellite                                                                 2>&1 | tee -ai "$LOG"
     return    
   fi
@@ -241,7 +252,7 @@ add_jobs_to_crontab() {
 }
 
 # ------------------------------------------------------------------------------
-# Check Pi.Alert Installation Path
+# Check Pi.Alert-Satellite Installation Path
 # ------------------------------------------------------------------------------
 check_pialert_satellite_home() {
   mkdir -p "$INSTALL_DIR"
@@ -250,13 +261,13 @@ check_pialert_satellite_home() {
   fi
 
   if [ -e "$PIALERT_SATELLITE_HOME" ] || [ -L "$PIALERT_SATELLITE_HOME" ] ; then
-    process_error "Pi.Alert Satellite path already exists: $PIALERT_SATELLITE_HOME"
+    process_error "Pi.Alert-Satellite path already exists: $PIALERT_SATELLITE_HOME"
   fi
   sudo apt-get install cron whiptail -y
 }
 
 # ------------------------------------------------------------------------------
-# Check Pi.Alert Installation Path
+# Check Pi.Alert-Satellite Installation Path
 # ------------------------------------------------------------------------------
 install_dependencies() {
   print_msg "- Installing dependencies..."
@@ -318,7 +329,7 @@ process_error() {
   log ""
   log "************************************************************"
   log "************************************************************"
-  log "**          ERROR INSTALLING PI.ALERT SATELLITE           **"
+  log "**          ERROR INSTALLING PI.ALERT-SATELLITE           **"
   log "************************************************************"
   log "************************************************************"
   log ""
@@ -327,7 +338,7 @@ process_error() {
   log "Use 'cat $LOG' to view installation log"
   log ""
 
-  # msgbox "****** ERROR INSTALLING Pi.ALERT ******" "$1"
+  # msgbox "****** ERROR INSTALLING Pi.Alert-Satellite ******" "$1"
   exit 1
 }
 
