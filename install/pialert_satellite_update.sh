@@ -50,7 +50,7 @@ configure_user() {
   SAT_USER=$(whoami)
   print_msg "Pi.Alert-Satellite User: $SAT_USER"
   echo -e "    ...Create Satellite sudoer file to be able to run \"arp-scan\""
-  echo "${SAT_USER} ALL=(ALL) NOPASSWD: /usr/sbin/arp-scan" | sudo tee -a /etc/sudoers.d/pialert-satellite
+  echo "${SAT_USER} ALL=(ALL) NOPASSWD: /usr/sbin/arp-scan" | sudo tee /etc/sudoers.d/pialert-satellite
 }
 
 # ------------------------------------------------------------------------------
