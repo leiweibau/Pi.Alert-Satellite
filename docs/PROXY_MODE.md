@@ -46,3 +46,5 @@ corresponding error page. All other states are "answered" in the form of a JSON 
 used to download the files and has the additional function of deleting all scan results on the proxy that are older than 10 minutes. The reason for this 
 is that if the satellite or the Internet connection from the satellite fails, the last available scan is not constantly loaded, making it appear as if 
 everything is OK. By deleting the old scans, the satellite and all connected devices are displayed as offline.
+
+[Back](https://github.com/leiweibau/Pi.Alert-Satellite?tab=readme-ov-file#pialert-satellite)

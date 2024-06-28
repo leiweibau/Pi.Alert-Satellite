@@ -3,6 +3,8 @@ A companion script for [Pi.Alert](https://github.com/leiweibau/Pi.Alert), which 
 
 ### The satellite can operate in 1 of 2 different modes
 
+![Satellite Modes][Satellite_Modes]
+
 #### Direct API call:
 Here the API of the Pi.Alert instance is called. This API compares the transmitted token with the Pi.Alert database to check whether the token is valid. If this is the case, the encrypted payload is decrypted and processed together with the scans of the Pi.Alert instance.
 
@@ -39,6 +41,8 @@ bash -c "$(wget -qLO - https://github.com/leiweibau/Pi.Alert-Satellite/raw/main/
 As an alternative to this installation, you can also click on the blue "i" icon on the right in the line of the corresponding satellite in the Pi.Alert instance after creating a satellite and create the 
 installation command, which takes care of the important configuration during the installation.
 
+[Main Config flie parameter](docs/CONFIG_FILE.md)
+
 | ![Config MainScreen][Config] | ![PreConfig Modal][PreConfig] |
 | ---------------------------- | ----------------------------- |
 
@@ -74,5 +78,6 @@ In the directory "pialert-satellite/install/" there is a script called "pialert_
   leiweibau@gmail.com
 
 
-[Config]:    https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_config.png          "Config MainScreen"
-[PreConfig]: https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_preconfig.png       "PreConfig Modal"
+[Config]:          https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_config.png      "Config MainScreen"
+[PreConfig]:       https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/satellite_preconfig.png   "PreConfig Modal"
+[Satellite_Modes]: https://raw.githubusercontent.com/leiweibau/Pi.Alert/assets/Satellite_Modes.png       "Satellite Modes"
