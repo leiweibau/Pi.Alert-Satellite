@@ -499,6 +499,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
         'hostname': local_hostname,
+        'satellite_version': VERSION_DATE,
         'satellite_ip': local_ip,
         'satellite_mac': local_mac,
         'satellite_id': SATELLITE_TOKEN,
