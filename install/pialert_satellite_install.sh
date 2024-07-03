@@ -63,9 +63,9 @@ install_additional_dependencies() {
   sudo arp-scan -l | head -n -3 | tail +3 | tee -a "$LOG"
 
   print_msg "- Installing dnsutils & net-tools..."
-  sudo apt-get install dnsutils net-tools libwww-perl libtext-csv-perl -y   2>&1 >> "$LOG"
+  sudo apt-get install dnsutils net-tools curl libwww-perl libtext-csv-perl -y   2>&1 >> "$LOG"
 
-  print_msg "- Installing nmap, zip, aria2 and wakeonlan"
+  print_msg "- Installing aria2"
   sudo apt-get install aria2 -y                                             2>&1 >> "$LOG"
 
   print_header "Python"
