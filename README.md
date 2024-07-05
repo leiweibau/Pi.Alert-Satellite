@@ -64,6 +64,8 @@ bash -c "$(wget -qLO - https://github.com/leiweibau/Pi.Alert-Satellite/raw/main/
   </tbody>
 </table>
 
+An archive of older versions can be found at [https://leiweibau.net/archive/pialert-satellite/](https://leiweibau.net/archive/pialert-satellite/). This archive contains all release notes.
+
 ### Uninstall
 <!--- --------------------------------------------------------------------- --->
 
