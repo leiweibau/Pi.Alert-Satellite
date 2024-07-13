@@ -13,7 +13,7 @@
 from __future__ import print_function
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from mac_vendor_lookup import MacLookup
-from time import sleep, time, strftime
+from time import sleep, time, strftime, monotonic
 from base64 import b64encode
 from urllib.parse import urlparse
 from cryptography import x509
@@ -496,6 +496,19 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     local_hostname = socket.gethostname()
 
+    # Get Uptime
+    monotonic_time = monotonic()
+    weeks = int(monotonic_time // 604800)
+    days = int((monotonic_time % 604800) // 86400)
+    hours = int((monotonic_time % 86400) // 3600)
+    minutes = int((monotonic_time % 3600) // 60)
+    seconds = int(monotonic_time % 60)
+
+    if weeks > 0:
+        formatted_uptime = f"{weeks}w {days}d {hours:02}:{minutes:02}:{seconds:02}"
+    else:
+        formatted_uptime = f"{days}d {hours:02}:{minutes:02}:{seconds:02}"
+
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
         'hostname': local_hostname,
@@ -503,7 +516,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'satellite_ip': local_ip,
         'satellite_mac': local_mac,
         'satellite_id': SATELLITE_TOKEN,
-        'scan_time': str(startTime)
+        'scan_time': str(startTime),
+        'uptime': formatted_uptime
     }]
 
     satellite_scan_config = [{
