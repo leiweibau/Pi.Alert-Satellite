@@ -20,7 +20,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -509,10 +509,26 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     else:
         formatted_uptime = f"{days}d {hours:02}:{minutes:02}:{seconds:02}"
 
-
     # Get Process count
     get_proc_count = subprocess.run(['sh', '-c', 'ps -e | wc -l'], capture_output=True, text=True)
     proc_count = get_proc_count.stdout.strip()
+
+
+    # Get System
+    try:
+        import distro
+        distro_available = True
+    except ImportError:
+        distro_available = False
+
+    os_name = platform.system()
+
+    if os_name == 'Linux' and distro_available:
+        dist_name = distro.name()
+        dist_version = distro.version()
+        sat_os_name = f"{dist_name} {dist_version}"
+    else:
+        sat_os_name = os_name
 
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
@@ -527,7 +543,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'cpu_arch': cpuinfo.get_cpu_info()['raw_arch_string'],
         'cpu_cores': cpuinfo.get_cpu_info()['count'],
         'cpu_freq': cpuinfo.get_cpu_info()['hz_actual'],
-        'proc_count': proc_count
+        'proc_count': proc_count,
+        'os_version': sat_os_name
     }]
 
     satellite_scan_config = [{
