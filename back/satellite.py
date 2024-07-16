@@ -250,8 +250,8 @@ def execute_arpscan():
 
     # multiple interfaces
     if type(SCAN_SUBNETS) is list:
-        print("    arp-scan: Multiple interfaces")        
-        for interface in SCAN_SUBNETS :            
+        print("    arp-scan: Multiple interfaces")
+        for interface in SCAN_SUBNETS :
             arpscan_output += execute_arpscan_on_interface (interface)
     # one interface only
     else:
@@ -523,10 +523,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     os_name = platform.system()
 
-    if os_name == 'Linux' and distro_available:
-        dist_name = distro.name()
-        dist_version = distro.version()
-        sat_os_name = f"{dist_name} {dist_version}"
+    if distro_available:
+        dist_name = distro.name(pretty=True)
+        sat_os_name = f"{dist_name}"
     else:
         sat_os_name = os_name
 
