@@ -20,7 +20,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, psutil
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -542,6 +542,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'cpu_arch': cpuinfo.get_cpu_info()['raw_arch_string'],
         'cpu_cores': cpuinfo.get_cpu_info()['count'],
         'cpu_freq': cpuinfo.get_cpu_info()['hz_actual'],
+        'ram_total': psutil.virtual_memory()[0],
+        'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
         'os_version': sat_os_name
     }]
