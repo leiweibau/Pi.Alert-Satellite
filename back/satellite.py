@@ -505,9 +505,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     seconds = int(monotonic_time % 60)
 
     if weeks > 0:
-        formatted_uptime = f"{weeks}w {days}d {hours:02}:{minutes:02}:{seconds:02}"
+        formatted_uptime = f"{weeks}w {days}d {hours:02}h {minutes:02}m {seconds:02}s "
     else:
-        formatted_uptime = f"{days}d {hours:02}:{minutes:02}:{seconds:02}"
+        formatted_uptime = f"{days}d {hours:02}h {minutes:02}m {seconds:02}s "
 
     # Get Process count
     get_proc_count = subprocess.run(['sh', '-c', 'ps -e | wc -l'], capture_output=True, text=True)
@@ -575,7 +575,7 @@ def encrypt_submit_scandata(json_data):
 
     # OpenSSL command for encrypting the data
     openssl_command = [
-        "openssl", "enc", "-aes-256-cbc", "-salt", "-out", SATELLITE_BACK_PATH + "encrypted_scandata", "-pbkdf2",
+        "openssl", "enc", "-aes-256-cbc", "-salt", "-out", SATELLITE_BACK_PATH + "/encrypted_scandata", "-pbkdf2",
         "-pass", "pass:{}".format(SATELLITE_PASSWORD)
     ]
 
@@ -587,7 +587,7 @@ def encrypt_submit_scandata(json_data):
     #     json.dump(json_data, outfile, indent=4)
 
     # Read the encrypted data from the file
-    with open(SATELLITE_BACK_PATH + "encrypted_scandata", "rb") as f:
+    with open(SATELLITE_BACK_PATH + "/encrypted_scandata", "rb") as f:
         encrypted_data = f.read()
 
     transfer_mode = "proxy" if PROXY_MODE else "direct"
@@ -630,7 +630,7 @@ def print_log (pText):
     if not PRINT_LOG :
         return
 
-    # Current Time    
+    # Current Time
     log_timestamp2 = datetime.datetime.now()
 
     # Print line + time + elapsed time + text
@@ -646,4 +646,4 @@ def print_log (pText):
 # BEGIN
 #===============================================================================
 if __name__ == '__main__':
-    sys.exit(main())       
+    sys.exit(main())
