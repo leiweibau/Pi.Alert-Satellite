@@ -87,10 +87,10 @@ install_additional_dependencies() {
 
   if $PYTHON3 ; then
     print_msg "- Using Python 3"
-    sudo apt-get install python3-pip python3-cryptography python3-requests python3-cpuinfo python3-distro -y                 2>&1 >> "$LOG"
+    sudo apt-get install python3-pip python3-cryptography python3-requests python3-cpuinfo python3-distro python3-psutil -y                 2>&1 >> "$LOG"
   else
     print_msg "- Installing Python 3..."
-    sudo apt-get install python3 python3-pip python3-cryptography python3-requests python3-cpuinfo python3-distro -y         2>&1 >> "$LOG"
+    sudo apt-get install python3 python3-pip python3-cryptography python3-requests python3-cpuinfo python3-distro python3-psutil -y         2>&1 >> "$LOG"
   fi
   print_msg "    - Install additional packages"
   if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
