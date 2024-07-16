@@ -505,9 +505,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     seconds = int(monotonic_time % 60)
 
     if weeks > 0:
-        formatted_uptime = f"{weeks}w {days}d {hours:02}h {minutes:02}m {seconds:02}s "
+        formatted_uptime = f"{weeks}w {days}d {hours:02}h {minutes:02}m "
     else:
-        formatted_uptime = f"{days}d {hours:02}h {minutes:02}m {seconds:02}s "
+        formatted_uptime = f"{days}d {hours:02}h {minutes:02}m "
 
     # Get Process count
     get_proc_count = subprocess.run(['sh', '-c', 'ps -e | wc -l'], capture_output=True, text=True)
