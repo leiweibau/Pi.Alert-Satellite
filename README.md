@@ -1,5 +1,5 @@
 # Pi.Alert Satellite
-A companion script for [Pi.Alert](https://github.com/leiweibau/Pi.Alert), which executes the Pi.Alert scan on an external host and sends the data as encrypted JSON to a special API.
+A companion script for [Pi.Alert](https://github.com/leiweibau/Pi.Alert), which executes the Pi.Alert scan on an external host and sends the data as encrypted [JSON](docs/JSON_DEMO.md) to a special API.
 
 ### The satellite can operate in 1 of 2 different modes
 
