@@ -32,7 +32,7 @@ Here you can see the basic structure of the unencrypted json, which is sent encr
     "scan_results": [
         {
             "cur_MAC": "Internet - <SATELLITE_TOKEN>",
-            "cur_IP": "79.198.124.10",
+            "cur_IP": "<PUBLIC IP>",
             "cur_Vendor": "",
             "cur_ScanMethod": "Internet Check",
             "cur_SatelliteID": "<SATELLITE_TOKEN>"
