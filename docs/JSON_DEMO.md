@@ -18,7 +18,11 @@ Here you can see the basic structure of the unencrypted json, which is sent encr
             "cpu_arch": "x86_64",
             "cpu_cores": 2,
             "cpu_freq": "2.4167 GHz",
-            "proc_count": "138"
+            "ram_total": 773668864,
+            "ram_used_percent": 44.9,
+            "proc_count": "138",
+            "os_version": "Debian GNU/Linux 11 (bullseye)", 
+            "os_timezone": "Europe/London"
         }
     ],
     "satellite_scan_config": [
