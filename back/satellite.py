@@ -20,7 +20,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, psutil
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, psutil, tzlocal
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -513,7 +513,6 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     get_proc_count = subprocess.run(['sh', '-c', 'ps -e | wc -l'], capture_output=True, text=True)
     proc_count = get_proc_count.stdout.strip()
 
-
     # Get System
     try:
         import distro
@@ -528,6 +527,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         sat_os_name = f"{dist_name}"
     else:
         sat_os_name = os_name
+
+    # Get local timezone
+    sat_os_timezone = tzlocal.get_localzone()
 
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
@@ -545,7 +547,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'ram_total': psutil.virtual_memory()[0],
         'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
-        'os_version': sat_os_name
+        'os_version': sat_os_name,
+        'os_timezone': sat_os_timezone
     }]
 
     satellite_scan_config = [{
