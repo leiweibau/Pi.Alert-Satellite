@@ -70,7 +70,7 @@ create_backup() {
 # ------------------------------------------------------------------------------
 check_packages() {
   sudo apt-get update 2>&1 >>"$LOG"
-  packages=("apt-utils" "git" "dnsutils" "net-tools" "nbtscan" "avahi-utils" "python3-requests" "python3-cpuinfo" "python3-psutil" "python3-distro" "python3-cryptography" "libwww-perl" "mmdb-bin" "libtext-csv-perl" "aria2")
+  packages=("apt-utils" "git" "dnsutils" "net-tools" "nbtscan" "avahi-utils" "python3-requests" "python3-cpuinfo" "python3-psutil" "python3-distro" "python3-cryptography" "python3-tz" "python3-tzlocal" "libwww-perl" "mmdb-bin" "libtext-csv-perl" "aria2")
   print_msg "- Checking packages..."
   missing_packages=()
   for package in "${packages[@]}"; do
