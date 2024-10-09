@@ -548,7 +548,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
         'os_version': sat_os_name,
-        'os_timezone': sat_os_timezone
+        'os_timezone': str(sat_os_timezone)
     }]
 
     satellite_scan_config = [{
