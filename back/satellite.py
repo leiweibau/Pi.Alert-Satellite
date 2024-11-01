@@ -11,6 +11,8 @@
 # IMPORTS
 #===============================================================================
 from __future__ import print_function
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from mac_vendor_lookup import MacLookup
 from time import sleep, time, strftime, monotonic
@@ -20,7 +22,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, psutil, tzlocal
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -59,7 +61,7 @@ def main():
 
     # Check parameters
     if len(sys.argv) != 2 :
-        print('usage satelite scan | internet_IP | update_vendors' )
+        print('usage satelite scan | internet_IP | update_vendors | email_test' )
         return
     cycle = str(sys.argv[1])
 
@@ -70,8 +72,10 @@ def main():
         res = update_devices_MAC_vendors('-s')
     elif cycle == 'scan':
         res = scan_network()
+    elif cycle == 'email_test':
+        res = mail_notification('Test')
     else:
-        print('usage satelite scan | internet_IP | update_vendors' )
+        print('usage satelite scan | internet_IP | update_vendors | email_test' )
         return
 
     # Remove scan status file created in scan_network()
@@ -616,6 +620,11 @@ def encrypt_submit_scandata(json_data):
     try:
         response_data = response.json()
         print(f"    API-Response: {response_data}")
+        # if statuscode != 0 speichere das Log
+        # nach x Logs schreibe eine Mail und hänge die Logs an, erstelle eine Datei, an der erkannt wird, dass eine Mail gesendet wurde
+        # wenn nach weniger als x Logs wieder eine erfolgreiche Übermittlung stattfindet, lösche die Logs
+        # wenn nach x Logs weitere Logs kommen, werden die nicht mehr gesendet, da die Datei es verindert.
+        # wenn im Anschluss wieder eine erfolgreiche übermittlung stattfindet, lösche die Datei und alle Logs
         # print(response_data)
     except json.JSONDecodeError:
         print("     API-Response: ERROR:")
@@ -624,6 +633,39 @@ def encrypt_submit_scandata(json_data):
         print("------------------------------------------------------------------------")
         print(response.text)
         print("------------------------------------------------------------------------")
+
+#-------------------------------------------------------------------------------
+def mail_notification(_Mode):
+    global log_timestamp
+
+    if _Mode == 'Test' :
+        notiMessage = "Test-Notification"
+        send_email (notiMessage, notiMessage)
+        print('Test-Notification sent')
+    else:
+        print('Random Notification')
+
+#-------------------------------------------------------------------------------
+def send_email(pText, pHTML):
+    # Compose email
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Pi.Alert Report'
+    msg['From'] = REPORT_FROM
+    msg['To'] = REPORT_TO
+    msg.attach (MIMEText (pText, 'plain'))
+    msg.attach (MIMEText (pHTML, 'html'))
+
+    # Send mail
+    smtp_connection = smtplib.SMTP (SMTP_SERVER, SMTP_PORT)
+    smtp_connection.ehlo()
+    if not SafeParseGlobalBool("SMTP_SKIP_TLS"):
+        smtp_connection.starttls()
+        smtp_connection.ehlo()
+    if not SafeParseGlobalBool("SMTP_SKIP_LOGIN"):
+        escaped_password = repr(SMTP_PASS)[1:-1]
+        smtp_connection.login (SMTP_USER, escaped_password)
+    smtp_connection.sendmail (REPORT_FROM, REPORT_TO, msg.as_string())
+    smtp_connection.quit()
 
 #===============================================================================
 # UTIL

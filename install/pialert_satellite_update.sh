@@ -114,16 +114,22 @@ update_config() {
 
   print_msg "- Updating config file..."
 
-# 2023-10-19
-# if ! grep -Fq "# Automatic Speedtest" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
-#   cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+# 2024-11-01
+if ! grep -Fq "# Mail-Account Settings" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
 
-# # Automatic Speedtest
-# # ----------------------
-# SPEEDTEST_TASK_ACTIVE = False
-# SPEEDTEST_TASK_HOUR   = []
-# EOF
-# fi
+SATELLITE_ERROR_REPORT = False
+
+# Mail-Account Settings
+# ----------------------
+SMTP_SERVER       = 'smtp.gmail.com'
+SMTP_PORT         = 587
+SMTP_USER         = 'user@gmail.com'
+SMTP_PASS         = 'password'
+SMTP_SKIP_TLS   = False
+SMTP_SKIP_LOGIN   = False
+EOF
+fi
 
 }
 
