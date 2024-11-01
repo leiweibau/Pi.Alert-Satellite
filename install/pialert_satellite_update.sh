@@ -122,12 +122,16 @@ SATELLITE_ERROR_REPORT = False
 
 # Mail-Account Settings
 # ----------------------
-SMTP_SERVER       = 'smtp.gmail.com'
-SMTP_PORT         = 587
-SMTP_USER         = 'user@gmail.com'
-SMTP_PASS         = 'password'
-SMTP_SKIP_TLS   = False
-SMTP_SKIP_LOGIN   = False
+SMTP_SERVER              = 'smtp.gmail.com'
+SMTP_PORT                = 587
+SMTP_USER                = 'user@gmail.com'
+SMTP_PASS                = 'password'
+SMTP_SKIP_TLS            = False
+SMTP_SKIP_LOGIN          = False
+FRIENDLY_NAME            = 'My Satellite'
+MAIL_FROM                = FRIENDLY_NAME + ' - Pi.Alert Satellite <' + SMTP_USER +'>'
+MAIL_TO                  = 'destination@example.com'
+COLLECT_REPORTS_FOR_MAIL = 10
 EOF
 fi
 
