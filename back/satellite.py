@@ -34,6 +34,7 @@ SATELLITE_PATH = SATELLITE_BACK_PATH + "/.."
 SATELLITE_LOG_PATH = SATELLITE_PATH + "/log"
 STATUS_FILE_SCAN = SATELLITE_BACK_PATH + "/.scanning"
 STATUS_FILE_BACKUP = SATELLITE_BACK_PATH + "/.backup"
+STATUS_FILE_REPORTED = SATELLITE_BACK_PATH + "/.reported"
 
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
@@ -632,14 +633,17 @@ def encrypt_submit_scandata(json_data):
         response_data = response.json()
         print(f"    API-Response: {response_data}")
 
-        # if statuscode != 0 speichere das Log
+        # if statuscode != 0 save Logs
         if response_data.get('status') != '0':
             save_error(response_data)
         else:
+            # if a successful transmission takes place again after less than x logs, delete the logs
+            # if a successful transmission occurs again afterwards, delete the file and all logs
             delete_error_files()
+            notification_stop('stop')
 
     except json.JSONDecodeError:
-        print("     API-Response: ERROR:")
+        print("    API-Response: ERROR:")
         print("------------------------------------------------------------------------")
         print("                                Raw output")
         print("------------------------------------------------------------------------")
@@ -649,53 +653,75 @@ def encrypt_submit_scandata(json_data):
 
 #-------------------------------------------------------------------------------
 def save_error(response_data):
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    existing_files = [
-        f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
-        if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
-    ]
-    file_count = len(existing_files) + 1
-    
-    file_name = f"{file_count}_error_{timestamp}.txt"
-    file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
-    
-    with open(file_path, 'w') as file:
-        json.dump(response_data, file)
-    
-    print(f"    Error saved to file: {file_path}")
+    if SATELLITE_ERROR_REPORT:
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        existing_files = [
+            f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
+            if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
+        ]
+        file_count = len(existing_files) + 1
+        
+        file_name = f"{file_count}_error_{timestamp}.txt"
+        file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
+        
+        with open(file_path, 'w') as file:
+            json.dump(response_data, file)
+        
+        print(f"    Error saved to file: {file_path}")
+    else:
+        print(f"    Error reporting disabled")
+        delete_error_files()
 
 #-------------------------------------------------------------------------------
 def delete_error_files():
-    
     for file_name in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH)):
-        # Prüfe, ob der Dateiname dem Namensschema entspricht
+        # Check whether the file name corresponds to the naming scheme
         if "_error_" in file_name and file_name.endswith(".txt"):
             file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
             try:
                 os.remove(file_path)  # Lösche die Datei
-                print(f"File deleted: {file_name}")
+                print(f"        File deleted: {file_name}")
             except Exception as e:
-                print(f"Error deleting file: {file_name}")
+                print(f"        Error deleting file: {file_name}")
+    notification_stop('stop')
+
+#-------------------------------------------------------------------------------
+def notification_stop(mode):
+    if mode == "start":
+        with open(STATUS_FILE_REPORTED, 'w') as file:
+            pass
+
+    if mode == "stop":
+        if os.path.exists(STATUS_FILE_REPORTED):
+            os.remove(STATUS_FILE_REPORTED)
 
 #-------------------------------------------------------------------------------
 def mail_notification(_Mode):
     global log_timestamp
 
-    print(f"\nSatellite error reporting")
-
     if SATELLITE_ERROR_REPORT:
         if _Mode == 'Test' :
+            print(f"\nTest Message")
             notiMessage = "Test-Notification"
             send_email (notiMessage, notiMessage, False)
+        # If further logs are sent after x logs, they are no longer sent because the file prevents it.
         else:
-            existing_files = [
-                f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
-                if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
-            ]
+            print(f"\nSatellite error reporting")
+            # No test message
+            # If further logs are sent after x logs, they are no longer sent because the file prevents it.
+            # The stop file is checked
+            # Stop file does not exist
+            if not os.path.exists(STATUS_FILE_REPORTED):
+                # Count the reports to recognize whether a message should be sent
+                existing_files = [
+                    f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
+                    if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
+                ]
 
-            if len(existing_files) >= COLLECT_REPORTS_FOR_MAIL:
-                notiTEXT = 'The threshold for repeated transmission errors from the satellite to the API has been reached.'
-                notiHTML = """\
+                # after x logs write an e-mail and attach the logs
+                if len(existing_files) >= COLLECT_REPORTS_FOR_MAIL:
+                    notiTEXT = 'The threshold for repeated transmission errors from the satellite to the API has been reached.'
+                    notiHTML = """\
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -709,15 +735,14 @@ def mail_notification(_Mode):
   </body>
 </html>
 """
-                send_email (notiTEXT, notiHTML, True)
+                    send_email (notiTEXT, notiHTML, True)
+                    # create a file that recognizes that a mail has been sent
+                    notification_stop('start')
+                else:
+                    print('    Nothing to report')
             else:
-                print('Nothing to report')
+                print('    Reporting stopped because a mail has already been sent')
 
-            ##### nach x Logs schreibe eine Mail und hänge die Logs an
-            # erstelle eine Datei, an der erkannt wird, dass eine Mail gesendet wurde
-            ##### wenn nach weniger als x Logs wieder eine erfolgreiche Übermittlung stattfindet, lösche die Logs
-            # wenn nach x Logs weitere Logs kommen, werden die nicht mehr gesendet, da die Datei es verindert.
-            # wenn im Anschluss wieder eine erfolgreiche übermittlung stattfindet, lösche die Datei und alle Logs
     else:
         print('    Satellite error reporting is disabled')
 #-------------------------------------------------------------------------------

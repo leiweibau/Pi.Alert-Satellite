@@ -131,7 +131,8 @@ SMTP_SKIP_LOGIN          = False
 FRIENDLY_NAME            = 'My Satellite'
 MAIL_FROM                = FRIENDLY_NAME + ' - Pi.Alert Satellite <' + SMTP_USER +'>'
 MAIL_TO                  = 'destination@example.com'
-COLLECT_REPORTS_FOR_MAIL = 10
+COLLECT_REPORTS_FOR_MAIL = 12
+# Since a scan is performed every 5 minutes, 12 corresponds to a period of 1 hour during which no successful transmission takes place until a notification is sent.
 EOF
 fi
 
