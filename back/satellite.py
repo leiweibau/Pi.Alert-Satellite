@@ -11,6 +11,10 @@
 # IMPORTS
 #===============================================================================
 from __future__ import print_function
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from mac_vendor_lookup import MacLookup
 from time import sleep, time, strftime, monotonic
@@ -20,15 +24,17 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, psutil, tzlocal
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal
 
 #===============================================================================
 # CONFIG CONSTANTS
 #===============================================================================
 SATELLITE_BACK_PATH = os.path.dirname(os.path.abspath(__file__))
 SATELLITE_PATH = SATELLITE_BACK_PATH + "/.."
+SATELLITE_LOG_PATH = SATELLITE_PATH + "/log"
 STATUS_FILE_SCAN = SATELLITE_BACK_PATH + "/.scanning"
 STATUS_FILE_BACKUP = SATELLITE_BACK_PATH + "/.backup"
+STATUS_FILE_REPORTED = SATELLITE_BACK_PATH + "/.reported"
 
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
@@ -44,6 +50,7 @@ def main():
     global startTime
     global cycle
     global log_timestamp
+    global report_timestamp
 
     # Header
     print('\nPi.Alert Satellite v'+ VERSION_DATE)
@@ -52,6 +59,7 @@ def main():
 
     # Initialize global variables
     log_timestamp  = datetime.datetime.now()
+    report_timestamp = len(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
 
     # Timestamp
     startTime = datetime.datetime.now()
@@ -59,7 +67,7 @@ def main():
 
     # Check parameters
     if len(sys.argv) != 2 :
-        print('usage satelite scan | internet_IP | update_vendors' )
+        print('usage satelite scan | internet_IP | update_vendors | email_test' )
         return
     cycle = str(sys.argv[1])
 
@@ -70,8 +78,10 @@ def main():
         res = update_devices_MAC_vendors('-s')
     elif cycle == 'scan':
         res = scan_network()
+    elif cycle == 'email_test':
+        res = mail_notification('Test')
     else:
-        print('usage satelite scan | internet_IP | update_vendors' )
+        print('usage satelite scan | internet_IP | update_vendors | email_test' )
         return
 
     # Remove scan status file created in scan_network()
@@ -228,9 +238,15 @@ def scan_network():
     jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
+    mail_notification("scan")
 
     return 0
 
+#-------------------------------------------------------------------------------
+def sorted_alphanumeric(data):
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+    return sorted(data, key=alphanum_key)
 
 #-------------------------------------------------------------------------------
 def execute_arpscan():
@@ -616,14 +632,167 @@ def encrypt_submit_scandata(json_data):
     try:
         response_data = response.json()
         print(f"    API-Response: {response_data}")
-        # print(response_data)
+
+        # if statuscode != 0 save Logs
+        if response_data.get('status') != '0':
+            save_error(response_data)
+        else:
+            # if a successful transmission takes place again after less than x logs, delete the logs
+            # if a successful transmission occurs again afterwards, delete the file and all logs
+            delete_error_files()
+            notification_stop('stop')
+
     except json.JSONDecodeError:
-        print("     API-Response: ERROR:")
+        print("    API-Response: ERROR:")
         print("------------------------------------------------------------------------")
         print("                                Raw output")
         print("------------------------------------------------------------------------")
         print(response.text)
         print("------------------------------------------------------------------------")
+        save_error(response.text)
+
+#-------------------------------------------------------------------------------
+def save_error(response_data):
+    if SATELLITE_ERROR_REPORT:
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        existing_files = [
+            f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
+            if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
+        ]
+        file_count = len(existing_files) + 1
+        
+        file_name = f"{file_count}_error_{timestamp}.txt"
+        file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
+        
+        with open(file_path, 'w') as file:
+            json.dump(response_data, file)
+        
+        print(f"    Error saved to file: {file_path}")
+    else:
+        print(f"    Error reporting disabled")
+        delete_error_files()
+
+#-------------------------------------------------------------------------------
+def delete_error_files():
+    for file_name in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH)):
+        # Check whether the file name corresponds to the naming scheme
+        if "_error_" in file_name and file_name.endswith(".txt"):
+            file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
+            try:
+                os.remove(file_path)  # Lösche die Datei
+                print(f"        File deleted: {file_name}")
+            except Exception as e:
+                print(f"        Error deleting file: {file_name}")
+    notification_stop('stop')
+
+#-------------------------------------------------------------------------------
+def notification_stop(mode):
+    if mode == "start":
+        with open(STATUS_FILE_REPORTED, 'w') as file:
+            pass
+
+    if mode == "stop":
+        if os.path.exists(STATUS_FILE_REPORTED):
+            os.remove(STATUS_FILE_REPORTED)
+
+#-------------------------------------------------------------------------------
+def mail_notification(_Mode):
+    global log_timestamp
+
+    if SATELLITE_ERROR_REPORT:
+        if _Mode == 'Test' :
+            print(f"\nTest Message")
+            notiMessage = "Test-Notification"
+            send_email (notiMessage, notiMessage, False)
+        # If further logs are sent after x logs, they are no longer sent because the file prevents it.
+        else:
+            print(f"\nSatellite error reporting")
+            # No test message
+            # If further logs are sent after x logs, they are no longer sent because the file prevents it.
+            # The stop file is checked
+            # Stop file does not exist
+            if not os.path.exists(STATUS_FILE_REPORTED):
+                # Count the reports to recognize whether a message should be sent
+                existing_files = [
+                    f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
+                    if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
+                ]
+
+                # after x logs write an e-mail and attach the logs
+                if len(existing_files) >= COLLECT_REPORTS_FOR_MAIL:
+                    notiTEXT = 'The threshold for repeated transmission errors from the satellite to the API has been reached.'
+                    notiHTML = """\
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-Mail Beispiel</title>
+</head>
+  <body>
+    <p style="color:Tomato;">The threshold for repeated transmission errors from the satellite to the API has been reached.</p>
+  </body>
+</html>
+"""
+                    send_email (notiTEXT, notiHTML, True)
+                    # create a file that recognizes that a mail has been sent
+                    notification_stop('start')
+                else:
+                    print('    Nothing to report')
+            else:
+                print('    Reporting stopped because a mail has already been sent')
+
+    else:
+        print('    Satellite error reporting is disabled')
+#-------------------------------------------------------------------------------
+def send_email(pText, pHTML, logs):
+    # Compose email
+    msg = MIMEMultipart()
+    msg['Subject'] = FRIENDLY_NAME + ' - Pi.Alert Satellite Message '
+    msg['From'] = MAIL_FROM
+    msg['To'] = MAIL_TO
+    alternative = MIMEMultipart('alternative')
+    alternative.attach(MIMEText(pText, 'plain'))
+    alternative.attach(MIMEText(pHTML, 'html'))
+    msg.attach(alternative)
+
+    if logs:
+        existing_files = [
+            f for f in sorted_alphanumeric(os.listdir(SATELLITE_LOG_PATH))
+            if f.endswith(".txt") and "_error_" in f and len(f.split('_error_')[1].replace('.txt', '')) == report_timestamp
+        ]
+
+        for file_name in existing_files:
+            file_path = os.path.join(SATELLITE_LOG_PATH, file_name)
+            with open(file_path, 'rb') as file:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(file.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f'attachment; filename="{file_name}"')
+                msg.attach(part)
+
+    # Send mail
+    try:
+        smtp_connection = smtplib.SMTP (SMTP_SERVER, SMTP_PORT)
+        smtp_connection.ehlo()
+        if not SafeParseGlobalBool("SMTP_SKIP_TLS"):
+            smtp_connection.starttls()
+            smtp_connection.ehlo()
+        if not SafeParseGlobalBool("SMTP_SKIP_LOGIN"):
+            escaped_password = repr(SMTP_PASS)[1:-1]
+            smtp_connection.login (SMTP_USER, escaped_password)
+        smtp_connection.sendmail (MAIL_FROM, MAIL_TO, msg.as_string())
+    except Exception as e:
+        print(f"    Error sending the e-mail")
+    finally:
+        smtp_connection.quit()
+        print(f"    Message sent")
+
+
+#-------------------------------------------------------------------------------
+def SafeParseGlobalBool(boolVariable):
+  return eval(boolVariable) if boolVariable in globals() else False
 
 #===============================================================================
 # UTIL
