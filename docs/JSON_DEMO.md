@@ -22,7 +22,8 @@ Here you can see the basic structure of the unencrypted json, which is sent encr
             "ram_used_percent": 44.9,
             "proc_count": "138",
             "os_version": "Debian GNU/Linux 11 (bullseye)", 
-            "os_timezone": "Europe/London"
+            "os_timezone": "Europe/London",
+            "error_reporting": "<SATELLITE_ERROR_REPORT>"
         }
     ],
     "satellite_scan_config": [
