@@ -63,10 +63,13 @@ install_additional_dependencies() {
   sudo arp-scan -l | head -n -3 | tail +3 | tee -a "$LOG"
 
   print_msg "- Installing dnsutils & net-tools..."
-  sudo apt-get install dnsutils net-tools curl libwww-perl libtext-csv-perl -y   2>&1 >> "$LOG"
+  sudo apt-get install dnsutils net-tools curl libwww-perl libtext-csv-perl -y        2>&1 >> "$LOG"
+
+  print_msg "- Installation of tools for hostname detection..."
+  sudo apt-get install avahi-utils nbtscan -y                                         2>&1 >> "$LOG"
 
   print_msg "- Installing aria2"
-  sudo apt-get install aria2 -y                                             2>&1 >> "$LOG"
+  sudo apt-get install aria2 -y                                                       2>&1 >> "$LOG"
 
   print_header "Python"
 
@@ -98,11 +101,13 @@ install_additional_dependencies() {
     pip3 -q install fritzconnection --break-system-packages --no-warn-script-location         2>&1 >> "$LOG"
     pip3 -q install routeros_api --break-system-packages --no-warn-script-location            2>&1 >> "$LOG"
     pip3 -q install pyunifi --break-system-packages --no-warn-script-location                 2>&1 >> "$LOG"
+    pip3 -q install openwrt-luci-rpc --break-system-packages --no-warn-script-location        2>&1 >> "$LOG"
   else
     pip3 -q install mac-vendor-lookup  --no-warn-script-location                              2>&1 >> "$LOG"
     pip3 -q install fritzconnection --no-warn-script-location                                 2>&1 >> "$LOG"
     pip3 -q install routeros_api --no-warn-script-location                                    2>&1 >> "$LOG"
     pip3 -q install pyunifi --no-warn-script-location                                         2>&1 >> "$LOG"
+    pip3 -q install openwrt-luci-rpc --no-warn-script-location                                2>&1 >> "$LOG"
   fi
 
   PYTHON_BIN="python3"
