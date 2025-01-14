@@ -212,28 +212,19 @@ def scan_network():
     internet_detection = check_internet_IP()
     # arp-scan command
     print('\nScanning...')
-    print('    arp-scan Method...')
+    # arp-scan
     print_log ('arp-scan starts...')
     arpscan_devices = execute_arpscan()
-    print_log ('arp-scan ends')
     # Fritzbox
-    print('    Fritzbox Method...')
-    # openDB()
     print_log ('Fritzbox copy starts...')
     fritzbox_network = read_fritzbox_active_hosts()
     # Mikrotik
-    print('    Mikrotik Method...')
-    # openDB()
     print_log ('Mikrotik copy starts...')
     mikrotik_network = read_mikrotik_leases()
     # UniFi
-    print('    UniFi Method...')
-    # openDB()
     print_log ('UniFi copy starts...')
     unifi_network = read_unifi_clients()
-    # Load current scan data 1/2
     print('\nProcessing scan results...')
-    # Load current scan data 2/2
     print('    Create json of scanned devices')
     jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
     print('    Encrypt data and transmit to Master or Proxy')
@@ -257,9 +248,10 @@ def execute_arpscan():
     except NameError:
         module_arpscan_status = True
     if not module_arpscan_status :
-        print('        ...Skipped')
         unique_devices = []
         return unique_devices
+
+    print('    arp-scan Method...')
 
     # output of possible multiple interfaces
     arpscan_output = ""
@@ -318,8 +310,9 @@ def read_fritzbox_active_hosts():
 
     # check if Pi-hole is active
     if not FRITZBOX_ACTIVE :
-        print('        ...Skipped')
         return
+
+    print('    Fritzbox Method...')
 
     from fritzconnection.lib.fritzhosts import FritzHosts
 
@@ -351,8 +344,9 @@ def read_fritzbox_active_hosts():
 def read_mikrotik_leases():
 
     if not MIKROTIK_ACTIVE:
-        print('        ...Skipped')
         return
+
+    print('    Mikrotik Method...')
 
     #installed using pip3 install routeros_api
     import routeros_api
@@ -389,8 +383,9 @@ def read_mikrotik_leases():
 def read_unifi_clients():
 
     if not UNIFI_ACTIVE:
-        print('        ...Skipped')
         return
+
+    print('    UniFi Method...')
 
     from pyunifi.controller import Controller
 
@@ -432,6 +427,96 @@ def read_unifi_clients():
         print('        Could not connect to UniFi Controller')
 
     return unifi_network
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_netbios(pIP):
+    try:
+        nbtscan_args =['nbtscan', '-v', '-s', ':', pIP+'/32']
+        newName = subprocess.run(nbtscan_args, capture_output=True, text=True, timeout=5)
+        if newName.returncode == 0 and newName.stdout:
+            lines = newName.stdout.strip().split('\n')
+            for line in lines:
+                if "00U" in line:
+                    segments = line.split(':')
+                    newName = segments[1].strip()
+        else:
+            newName = ""
+        return newName
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_avahi(pIP):
+    try:
+        avahi_args = ['avahi-resolve', '-a', pIP]
+        newName = subprocess.run(avahi_args, capture_output=True, text=True, timeout=5)
+        if newName.returncode == 0 and newName.stdout:
+                ip_regex = re.compile(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
+                newName = re.sub(ip_regex, '', newName.stdout)
+        else:
+            newName = ""
+        return newName.strip()
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+    except subprocess.CalledProcessError:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_dig(pIP):
+    # DNS Server Fallback
+    try:
+        temp = NETWORK_DNS_SERVER
+    except NameError:
+        NETWORK_DNS_SERVER = "localhost"
+
+    try: 
+        dig_args = ['dig', '+short', '-x', pIP, '@'+NETWORK_DNS_SERVER]
+        newName = subprocess.check_output (dig_args, universal_newlines=True, timeout=5)
+        if ";; communications error to" in newName:
+            newName = ""
+        return newName.strip()
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+    except subprocess.CalledProcessError:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name(pMAC, pIP):
+    pMACstr = str(pMAC)
+    
+    # Check MAC parameter
+    mac = pMACstr.replace (':','')
+    if len(pMACstr) != 17 or len(mac) != 12 :
+        return -2
+
+    newName = resolve_device_name_avahi(pIP)
+    if newName == "":
+        newName = resolve_device_name_dig(pIP)
+    if newName == "":
+        newName = resolve_device_name_netbios(pIP)
+
+    # Check returns
+    newName = newName.strip()
+    if len(newName) == 0 :
+        newName = "(satellite network client)"
+        
+    # Eliminate local domain
+    suffixes = ['.', '.lan', '.local', '.home']
+
+    for suffix in suffixes:
+        if newName.endswith(suffix):
+            newName = newName[:-len(suffix)]
+            break
+
+    return newName
 
 #-------------------------------------------------------------------------------
 def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
@@ -495,7 +580,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostname': '(satellite network client)',
+                    'cur_hostname': resolve_device_name(device['mac'],device['ip']),
                     'cur_Vendor': device['hw'],
                     'cur_ScanMethod': 'arp-scan',
                     'cur_SatelliteID': SATELLITE_TOKEN
