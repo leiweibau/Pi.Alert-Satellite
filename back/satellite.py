@@ -463,7 +463,9 @@ def read_openwrt_clients():
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     try:
-        router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), str(PASSWORD))
+        escaped_password = repr(OPENWRT_PASSWORD)[1:-1]
+
+        router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), escaped_password)
         result = router.get_all_connected_devices(only_reachable=True)
 
         for device in result:
@@ -676,8 +678,6 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     sat_os_timezone = tzlocal.get_localzone()
 
     cpu_info = cpuinfo.get_cpu_info()
-
-    print(cpu_info)
 
     try:
         cpu_brand = cpu_info['brand']
