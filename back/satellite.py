@@ -4,7 +4,7 @@
 #  Pi.Alert Satellite
 #-------------------------------------------------------------------------------
 #  Puche 2021                                              GNU GPLv3
-#  leiweibau 2024                                          GNU GPLv3
+#  leiweibau 2024+                                         GNU GPLv3
 #-------------------------------------------------------------------------------
 
 #===============================================================================
@@ -311,7 +311,6 @@ def execute_arpscan_on_interface(SCAN_SUBNETS):
 #-------------------------------------------------------------------------------
 def read_fritzbox_active_hosts():
 
-    # check if Pi-hole is active
     if not FRITZBOX_ACTIVE :
         return
 
