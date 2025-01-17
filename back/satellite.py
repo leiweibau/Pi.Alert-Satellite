@@ -675,6 +675,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get local timezone
     sat_os_timezone = tzlocal.get_localzone()
 
+    cpu_info = cpuinfo.get_cpu_info()
+
     try:
         cpu_brand = cpu_info['brand']
     except KeyError:
@@ -690,9 +692,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
         'cpu_name': cpu_brand,
-        'cpu_arch': cpuinfo.get_cpu_info()['raw_arch_string'],
-        'cpu_cores': cpuinfo.get_cpu_info()['count'],
-        'cpu_freq': cpuinfo.get_cpu_info()['hz_actual'],
+        'cpu_arch': cpu_info['raw_arch_string'],
+        'cpu_cores': cpu_info['count'],
+        'cpu_freq': cpu_info['hz_actual'],
         'ram_total': psutil.virtual_memory()[0],
         'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
