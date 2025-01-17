@@ -557,10 +557,13 @@ def resolve_device_name(pMAC, pIP):
         return -2
 
     newName = resolve_device_name_avahi(pIP)
+    print(f'Avahi: {newName}')
     if newName == "":
         newName = resolve_device_name_dig(pIP)
+        print(f'dig: {newName}')
     if newName == "":
         newName = resolve_device_name_netbios(pIP)
+        print(f'netbios: {newName}')
 
     # Check returns
     newName = newName.strip()
