@@ -529,12 +529,12 @@ def resolve_device_name_avahi(pIP):
 def resolve_device_name_dig(pIP):
     # DNS Server Fallback
     try:
-        temp = NETWORK_DNS_SERVER
+        dnsserver = NETWORK_DNS_SERVER
     except NameError:
-        NETWORK_DNS_SERVER = "localhost"
+        dnsserver = "localhost"
 
     try: 
-        dig_args = ['dig', '+short', '-x', pIP, '@'+NETWORK_DNS_SERVER]
+        dig_args = ['dig', '+short', '-x', pIP, '@'+dnsserver]
         newName = subprocess.check_output (dig_args, universal_newlines=True, timeout=5)
         if ";; communications error to" in newName:
             newName = ""
@@ -557,13 +557,10 @@ def resolve_device_name(pMAC, pIP):
         return -2
 
     newName = resolve_device_name_avahi(pIP)
-    print(f'Avahi: {newName}')
     if newName == "":
         newName = resolve_device_name_dig(pIP)
-        print(f'dig: {newName}')
     if newName == "":
         newName = resolve_device_name_netbios(pIP)
-        print(f'netbios: {newName}')
 
     # Check returns
     newName = newName.strip()
@@ -750,8 +747,8 @@ def encrypt_submit_scandata(json_data):
         proc.stdin.write(enc_json_data)
 
     # DEBUG
-    with open('output.json', 'w') as outfile:
-        json.dump(json_data, outfile, indent=4)
+    # with open('output.json', 'w') as outfile:
+    #     json.dump(json_data, outfile, indent=4)
 
     # Read the encrypted data from the file
     with open(SATELLITE_BACK_PATH + "/encrypted_scandata", "rb") as f:
