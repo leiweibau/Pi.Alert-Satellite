@@ -684,6 +684,11 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     except KeyError:
         cpu_brand = cpu_info['brand_raw']
 
+    try:
+        cpu_arch = cpu_info['arch']
+    except KeyError:
+        cpu_arch = cpu_info['arch_string_raw']
+
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
         'hostname': local_hostname,
@@ -694,7 +699,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
         'cpu_name': cpu_brand,
-        'cpu_arch': cpu_info['raw_arch_string'],
+        'cpu_arch': cpu_arch,
         'cpu_cores': cpu_info['count'],
         'cpu_freq': cpu_info['hz_actual'],
         'ram_total': psutil.virtual_memory()[0],
