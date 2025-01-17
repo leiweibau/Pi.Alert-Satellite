@@ -136,6 +136,19 @@ COLLECT_REPORTS_FOR_MAIL = 12
 EOF
 fi
 
+# 2025-01-17
+if ! grep -Fq "# OpenWRT Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# OpenWRT Configuration
+# ----------------------
+OPENWRT_ACTIVE   = False
+OPENWRT_IP       = '192.168.1.1'
+OPENWRT_USER     = 'root'
+OPENWRT_PASS     = ''
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------

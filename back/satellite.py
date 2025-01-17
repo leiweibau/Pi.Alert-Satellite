@@ -224,9 +224,12 @@ def scan_network():
     # UniFi
     print_log ('UniFi copy starts...')
     unifi_network = read_unifi_clients()
+    # OpenWRT
+    print_log ('OpenWRT copy starts...')
+    openwrt_network = read_openwrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -314,10 +317,15 @@ def read_fritzbox_active_hosts():
 
     print('    Fritzbox Method...')
 
-    from fritzconnection.lib.fritzhosts import FritzHosts
+    fritzbox_network = []
+
+    try:
+        from fritzconnection.lib.fritzhosts import FritzHosts
+    except:
+        print('        Missing python package')
+        return fritzbox_network
 
     # copy Fritzbox Network list
-    fritzbox_network = []
     fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
     hosts = fh.get_hosts_info()
     for index, host in enumerate(hosts, start=1):
@@ -348,10 +356,13 @@ def read_mikrotik_leases():
 
     print('    Mikrotik Method...')
 
-    #installed using pip3 install routeros_api
-    import routeros_api
-
     mikrotik_network = []
+
+    try:
+        import routeros_api
+    except:
+        print('        Missing python package')
+        return mikrotik_network
 
     data = []
     conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
@@ -387,7 +398,13 @@ def read_unifi_clients():
 
     print('    UniFi Method...')
 
-    from pyunifi.controller import Controller
+    unifi_network = []
+
+    try:
+        from pyunifi.controller import Controller
+    except:
+        print('        Missing python package')
+        return unifi_network
 
     # Enable self signed SSL / no warnings
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -396,8 +413,6 @@ def read_unifi_clients():
         UNIFI_API_VERSION = UNIFI_API
     except NameError: # variable not defined, use a default
         UNIFI_API_VERSION = 'v5'
-
-    unifi_network = []
 
     try:
         data = []
@@ -427,6 +442,48 @@ def read_unifi_clients():
         print('        Could not connect to UniFi Controller')
 
     return unifi_network
+
+#-------------------------------------------------------------------------------
+def read_openwrt_clients():
+
+    if not OPENWRT_ACTIVE:
+        return
+
+    print('    OpenWRT Method...')
+
+    openwrt_network = []
+
+    try:
+        from openwrt_luci_rpc import OpenWrtRpc
+    except:
+        print('        Missing python package')
+        return openwrt_network
+
+    # Enable self signed SSL / no warnings
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+    try:
+        router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), str(PASSWORD))
+        result = router.get_all_connected_devices(only_reachable=True)
+
+        for device in result:
+            if str(device.hostname) == 'None':
+                hostname = '(unknown)'
+            else:
+                hostname = device.hostname
+
+            device_data = {
+                "mac": device.mac,
+                "hostname": hostname,
+                "ip": device.ip,
+                "vendor:": "(unknown)"
+            }
+            openwrt_network.append(device_data)
+
+    except Exception as e:
+        print('        Could not connect to OpenWRT')
+
+    return openwrt_network
 
 #-------------------------------------------------------------------------------
 def resolve_device_name_netbios(pIP):
@@ -519,7 +576,22 @@ def resolve_device_name(pMAC, pIP):
     return newName
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
+def process_devices(network, scan_method, all_devices):
+    if network:
+        for device in network:
+            if len(device['mac']) > 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostname': device['hostname'],
+                    'cur_Vendor': device['vendor'],
+                    'cur_ScanMethod': scan_method,
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
+
+#-------------------------------------------------------------------------------
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network):
 
     all_devices = []
     # Internet Check
@@ -534,45 +606,16 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
+
     # Fritz!Box
-    if bool(p_fritzbox_network):
-        for device in p_fritzbox_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'Fritzbox',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_fritzbox_network, 'Fritzbox', all_devices)
     # Mikrotik
-    if bool(p_mikrotik_network):
-        for device in p_mikrotik_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'Mikrotik',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_mikrotik_network, 'Mikrotik', all_devices)
     # UniFi
-    if bool(p_unifi_network):
-        for device in p_unifi_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'UniFi',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_unifi_network, 'UniFi', all_devices)
+    # OpenWRT
+    process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+
     # Arpscan
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
