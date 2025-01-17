@@ -463,7 +463,7 @@ def read_openwrt_clients():
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     try:
-        escaped_password = repr(OPENWRT_PASSWORD)[1:-1]
+        escaped_password = repr(OPENWRT_PASS)[1:-1]
 
         router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), escaped_password)
         result = router.get_all_connected_devices(only_reachable=True)
@@ -478,7 +478,7 @@ def read_openwrt_clients():
                 "mac": device.mac,
                 "hostname": hostname,
                 "ip": device.ip,
-                "vendor:": "(unknown)"
+                "vendor": "(unknown)"
             }
             openwrt_network.append(device_data)
 
@@ -747,8 +747,8 @@ def encrypt_submit_scandata(json_data):
         proc.stdin.write(enc_json_data)
 
     # DEBUG
-    # with open('output.json', 'w') as outfile:
-    #     json.dump(json_data, outfile, indent=4)
+    with open('output.json', 'w') as outfile:
+        json.dump(json_data, outfile, indent=4)
 
     # Read the encrypted data from the file
     with open(SATELLITE_BACK_PATH + "/encrypted_scandata", "rb") as f:
