@@ -470,7 +470,7 @@ def read_openwrt_clients():
 
         for device in result:
             if str(device.hostname) == 'None':
-                hostname = '(unknown)'
+                hostname = resolve_device_name(device.mac,device.ip)
             else:
                 hostname = device.hostname
 
