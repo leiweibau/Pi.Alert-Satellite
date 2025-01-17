@@ -714,7 +714,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_arp': ARPSCAN_ACTIVE,
         'scan_fritzbox': FRITZBOX_ACTIVE,
         'scan_mikrotik': MIKROTIK_ACTIVE,
-        'scan_unifi': UNIFI_ACTIVE
+        'scan_unifi': UNIFI_ACTIVE,
+        'scan_openwrt': OPENWRT_ACTIVE
     }]
 
     # Write Data to JSON-file
