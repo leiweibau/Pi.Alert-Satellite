@@ -90,7 +90,7 @@ def main():
 
     # Final menssage
     print('\nDONE!!!\n\n')
-    return 0    
+    return 0
 
 #===============================================================================
 # Set Env (Userpermissions DB-file)
@@ -111,7 +111,7 @@ def check_internet_IP():
         print('    Error retrieving Internet IP')
         print('    Exiting...\n')
         return 1
-    
+
     print('   ', internet_IP)
 
     internet_detection = []
@@ -121,7 +121,7 @@ def check_internet_IP():
     }
 
     internet_detection.append(internet_scan)
-    
+
     return internet_detection
 
 # ------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ def get_internet_IP():
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
     cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
     return check_IP_format (cmd_output)
-    
+
 #-------------------------------------------------------------------------------
 def check_IP_format(pIP):
     # Check IP format
@@ -202,7 +202,7 @@ def query_MAC_vendor(pMAC):
     # not Found
     except subprocess.CalledProcessError :
         return -1
-            
+
 #-------------------------------------------------------------------------------
 def scan_network():
     # Header
@@ -273,18 +273,18 @@ def execute_arpscan():
     re_ip = r'(?P<ip>((2[0-5]|1[0-9]|[0-9])?[0-9]\.){3}((2[0-5]|1[0-9]|[0-9])?[0-9]))'
     re_mac = r'(?P<mac>([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2}))'
     re_hw = r'(?P<hw>.*)'
-    re_pattern = re.compile (re_ip + '\s+' + re_mac + '\s' + re_hw)
+    re_pattern = re.compile(r'' + re_ip + r'\s+' + re_mac + r'\s' + re_hw)
 
     # Create Userdict of devices
     devices_list = [device.groupdict()
         for device in re.finditer (re_pattern, arpscan_output)]
 
     # Delete duplicate MAC
-    unique_mac = [] 
-    unique_devices = [] 
+    unique_mac = []
+    unique_devices = []
 
-    for device in devices_list :
-        if device['mac'] not in unique_mac: 
+    for device in devices_list:
+        if device['mac'] not in unique_mac:
             unique_mac.append(device['mac'])
             unique_devices.append(device)
 
@@ -675,6 +675,11 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get local timezone
     sat_os_timezone = tzlocal.get_localzone()
 
+    try:
+        cpu_brand = cpu_info['brand']
+    except KeyError:
+        cpu_brand = cpu_info['brand_raw']
+
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
         'hostname': local_hostname,
@@ -684,7 +689,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'satellite_id': SATELLITE_TOKEN,
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
-        'cpu_name': cpuinfo.get_cpu_info()['brand'],
+        'cpu_name': cpu_brand,
         'cpu_arch': cpuinfo.get_cpu_info()['raw_arch_string'],
         'cpu_cores': cpuinfo.get_cpu_info()['count'],
         'cpu_freq': cpuinfo.get_cpu_info()['hz_actual'],
