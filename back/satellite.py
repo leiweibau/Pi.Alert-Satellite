@@ -550,7 +550,7 @@ def resolve_device_name_dig(pIP):
 #-------------------------------------------------------------------------------
 def resolve_device_name(pMAC, pIP):
     pMACstr = str(pMAC)
-    
+
     # Check MAC parameter
     mac = pMACstr.replace (':','')
     if len(pMACstr) != 17 or len(mac) != 12 :
@@ -566,7 +566,7 @@ def resolve_device_name(pMAC, pIP):
     newName = newName.strip()
     if len(newName) == 0 :
         newName = "(satellite network client)"
-        
+
     # Eliminate local domain
     suffixes = ['.', '.lan', '.local', '.home']
 
@@ -635,7 +635,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get Satellite MAC
     local_mac_cmd = ["/sbin/ifconfig `ip -o route get 1 | sed 's/^.*dev \\([^ ]*\\).*$/\\1/;q'` | grep ether | awk '{print $2}'"]
     local_mac = subprocess.Popen (local_mac_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
-    
+
     # Get Satellite IP
     local_ip_cmd = ["ip -o route get 1 | sed 's/^.*src \\([^ ]*\\).*$/\\1/;q'"]
     local_ip = subprocess.Popen (local_ip_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
