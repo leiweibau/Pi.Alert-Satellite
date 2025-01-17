@@ -677,6 +677,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     cpu_info = cpuinfo.get_cpu_info()
 
+    print(cpu_info)
+
     try:
         cpu_brand = cpu_info['brand']
     except KeyError:
