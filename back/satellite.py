@@ -483,7 +483,7 @@ def read_openwrt_clients():
             openwrt_network.append(device_data)
 
     except Exception as e:
-        print('        Could not connect to OpenWRT')
+        print(f'        Could not connect to OpenWRT: {e}')
 
     return openwrt_network
 
