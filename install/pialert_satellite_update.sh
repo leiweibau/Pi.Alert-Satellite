@@ -146,6 +146,9 @@ OPENWRT_ACTIVE   = False
 OPENWRT_IP       = '192.168.1.1'
 OPENWRT_USER     = 'root'
 OPENWRT_PASS     = ''
+
+
+NETWORK_DNS_SERVER    = 'localhost'
 EOF
 fi
 
