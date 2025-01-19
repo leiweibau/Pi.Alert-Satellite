@@ -4,7 +4,7 @@
 #  Pi.Alert Satellite
 #-------------------------------------------------------------------------------
 #  Puche 2021                                              GNU GPLv3
-#  leiweibau 2024                                          GNU GPLv3
+#  leiweibau 2024+                                         GNU GPLv3
 #-------------------------------------------------------------------------------
 
 #===============================================================================
@@ -90,7 +90,7 @@ def main():
 
     # Final menssage
     print('\nDONE!!!\n\n')
-    return 0    
+    return 0
 
 #===============================================================================
 # Set Env (Userpermissions DB-file)
@@ -111,7 +111,7 @@ def check_internet_IP():
         print('    Error retrieving Internet IP')
         print('    Exiting...\n')
         return 1
-    
+
     print('   ', internet_IP)
 
     internet_detection = []
@@ -121,7 +121,7 @@ def check_internet_IP():
     }
 
     internet_detection.append(internet_scan)
-    
+
     return internet_detection
 
 # ------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ def get_internet_IP():
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
     cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
     return check_IP_format (cmd_output)
-    
+
 #-------------------------------------------------------------------------------
 def check_IP_format(pIP):
     # Check IP format
@@ -202,7 +202,7 @@ def query_MAC_vendor(pMAC):
     # not Found
     except subprocess.CalledProcessError :
         return -1
-            
+
 #-------------------------------------------------------------------------------
 def scan_network():
     # Header
@@ -212,30 +212,24 @@ def scan_network():
     internet_detection = check_internet_IP()
     # arp-scan command
     print('\nScanning...')
-    print('    arp-scan Method...')
+    # arp-scan
     print_log ('arp-scan starts...')
     arpscan_devices = execute_arpscan()
-    print_log ('arp-scan ends')
     # Fritzbox
-    print('    Fritzbox Method...')
-    # openDB()
     print_log ('Fritzbox copy starts...')
     fritzbox_network = read_fritzbox_active_hosts()
     # Mikrotik
-    print('    Mikrotik Method...')
-    # openDB()
     print_log ('Mikrotik copy starts...')
     mikrotik_network = read_mikrotik_leases()
     # UniFi
-    print('    UniFi Method...')
-    # openDB()
     print_log ('UniFi copy starts...')
     unifi_network = read_unifi_clients()
-    # Load current scan data 1/2
+    # OpenWRT
+    print_log ('OpenWRT copy starts...')
+    openwrt_network = read_openwrt_clients()
     print('\nProcessing scan results...')
-    # Load current scan data 2/2
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -257,9 +251,10 @@ def execute_arpscan():
     except NameError:
         module_arpscan_status = True
     if not module_arpscan_status :
-        print('        ...Skipped')
         unique_devices = []
         return unique_devices
+
+    print('    arp-scan Method...')
 
     # output of possible multiple interfaces
     arpscan_output = ""
@@ -278,18 +273,18 @@ def execute_arpscan():
     re_ip = r'(?P<ip>((2[0-5]|1[0-9]|[0-9])?[0-9]\.){3}((2[0-5]|1[0-9]|[0-9])?[0-9]))'
     re_mac = r'(?P<mac>([0-9a-fA-F]{2}[:-]){5}([0-9a-fA-F]{2}))'
     re_hw = r'(?P<hw>.*)'
-    re_pattern = re.compile (re_ip + '\s+' + re_mac + '\s' + re_hw)
+    re_pattern = re.compile(r'' + re_ip + r'\s+' + re_mac + r'\s' + re_hw)
 
     # Create Userdict of devices
     devices_list = [device.groupdict()
         for device in re.finditer (re_pattern, arpscan_output)]
 
     # Delete duplicate MAC
-    unique_mac = [] 
-    unique_devices = [] 
+    unique_mac = []
+    unique_devices = []
 
-    for device in devices_list :
-        if device['mac'] not in unique_mac: 
+    for device in devices_list:
+        if device['mac'] not in unique_mac:
             unique_mac.append(device['mac'])
             unique_devices.append(device)
 
@@ -316,15 +311,20 @@ def execute_arpscan_on_interface(SCAN_SUBNETS):
 #-------------------------------------------------------------------------------
 def read_fritzbox_active_hosts():
 
-    # check if Pi-hole is active
     if not FRITZBOX_ACTIVE :
-        print('        ...Skipped')
         return
 
-    from fritzconnection.lib.fritzhosts import FritzHosts
+    print('    Fritzbox Method...')
+
+    fritzbox_network = []
+
+    try:
+        from fritzconnection.lib.fritzhosts import FritzHosts
+    except:
+        print('        Missing python package')
+        return fritzbox_network
 
     # copy Fritzbox Network list
-    fritzbox_network = []
     fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
     hosts = fh.get_hosts_info()
     for index, host in enumerate(hosts, start=1):
@@ -351,13 +351,17 @@ def read_fritzbox_active_hosts():
 def read_mikrotik_leases():
 
     if not MIKROTIK_ACTIVE:
-        print('        ...Skipped')
         return
 
-    #installed using pip3 install routeros_api
-    import routeros_api
+    print('    Mikrotik Method...')
 
     mikrotik_network = []
+
+    try:
+        import routeros_api
+    except:
+        print('        Missing python package')
+        return mikrotik_network
 
     data = []
     conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
@@ -389,10 +393,17 @@ def read_mikrotik_leases():
 def read_unifi_clients():
 
     if not UNIFI_ACTIVE:
-        print('        ...Skipped')
         return
 
-    from pyunifi.controller import Controller
+    print('    UniFi Method...')
+
+    unifi_network = []
+
+    try:
+        from pyunifi.controller import Controller
+    except:
+        print('        Missing python package')
+        return unifi_network
 
     # Enable self signed SSL / no warnings
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -401,8 +412,6 @@ def read_unifi_clients():
         UNIFI_API_VERSION = UNIFI_API
     except NameError: # variable not defined, use a default
         UNIFI_API_VERSION = 'v5'
-
-    unifi_network = []
 
     try:
         data = []
@@ -434,7 +443,156 @@ def read_unifi_clients():
     return unifi_network
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network):
+def read_openwrt_clients():
+
+    if not OPENWRT_ACTIVE:
+        return
+
+    print('    OpenWRT Method...')
+
+    openwrt_network = []
+
+    try:
+        from openwrt_luci_rpc import OpenWrtRpc
+    except:
+        print('        Missing python package')
+        return openwrt_network
+
+    # Enable self signed SSL / no warnings
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+    try:
+        escaped_password = repr(OPENWRT_PASS)[1:-1]
+
+        router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), escaped_password)
+        result = router.get_all_connected_devices(only_reachable=True)
+
+        for device in result:
+            if str(device.hostname) == 'None':
+                hostname = resolve_device_name(device.mac,device.ip)
+            else:
+                hostname = device.hostname
+
+            device_data = {
+                "mac": device.mac,
+                "hostname": hostname,
+                "ip": device.ip,
+                "vendor": "(unknown)"
+            }
+            openwrt_network.append(device_data)
+
+    except Exception as e:
+        print(f'        Could not connect to OpenWRT: {e}')
+
+    return openwrt_network
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_netbios(pIP):
+    try:
+        nbtscan_args =['nbtscan', '-v', '-s', ':', pIP+'/32']
+        newName = subprocess.run(nbtscan_args, capture_output=True, text=True, timeout=5)
+        if newName.returncode == 0 and newName.stdout:
+            lines = newName.stdout.strip().split('\n')
+            for line in lines:
+                if "00U" in line:
+                    segments = line.split(':')
+                    newName = segments[1].strip()
+        else:
+            newName = ""
+        return newName
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_avahi(pIP):
+    try:
+        avahi_args = ['avahi-resolve', '-a', pIP]
+        newName = subprocess.run(avahi_args, capture_output=True, text=True, timeout=5)
+        if newName.returncode == 0 and newName.stdout:
+                ip_regex = re.compile(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
+                newName = re.sub(ip_regex, '', newName.stdout)
+        else:
+            newName = ""
+        return newName.strip()
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+    except subprocess.CalledProcessError:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name_dig(pIP):
+    # DNS Server Fallback
+    try:
+        dnsserver = NETWORK_DNS_SERVER
+    except NameError:
+        dnsserver = "localhost"
+
+    try: 
+        dig_args = ['dig', '+short', '-x', pIP, '@'+dnsserver]
+        newName = subprocess.check_output (dig_args, universal_newlines=True, timeout=5)
+        if ";; communications error to" in newName:
+            newName = ""
+        return newName.strip()
+    # Error handling
+    except subprocess.TimeoutExpired:
+        newName = ""
+        return newName
+    except subprocess.CalledProcessError:
+        newName = ""
+        return newName
+
+#-------------------------------------------------------------------------------
+def resolve_device_name(pMAC, pIP):
+    pMACstr = str(pMAC)
+
+    # Check MAC parameter
+    mac = pMACstr.replace (':','')
+    if len(pMACstr) != 17 or len(mac) != 12 :
+        return -2
+
+    newName = resolve_device_name_avahi(pIP)
+    if newName == "":
+        newName = resolve_device_name_dig(pIP)
+    if newName == "":
+        newName = resolve_device_name_netbios(pIP)
+
+    # Check returns
+    newName = newName.strip()
+    if len(newName) == 0 :
+        newName = "(satellite network client)"
+
+    # Eliminate local domain
+    suffixes = ['.', '.lan', '.local', '.home']
+
+    for suffix in suffixes:
+        if newName.endswith(suffix):
+            newName = newName[:-len(suffix)]
+            break
+
+    return newName
+
+#-------------------------------------------------------------------------------
+def process_devices(network, scan_method, all_devices):
+    if network:
+        for device in network:
+            if len(device['mac']) > 12:
+                device_data = {
+                    'cur_MAC': device['mac'],
+                    'cur_IP': device['ip'],
+                    'cur_hostname': device['hostname'],
+                    'cur_Vendor': device['vendor'],
+                    'cur_ScanMethod': scan_method,
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
+
+#-------------------------------------------------------------------------------
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network):
 
     all_devices = []
     # Internet Check
@@ -449,45 +607,16 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
+
     # Fritz!Box
-    if bool(p_fritzbox_network):
-        for device in p_fritzbox_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'Fritzbox',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_fritzbox_network, 'Fritzbox', all_devices)
     # Mikrotik
-    if bool(p_mikrotik_network):
-        for device in p_mikrotik_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'Mikrotik',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_mikrotik_network, 'Mikrotik', all_devices)
     # UniFi
-    if bool(p_unifi_network):
-        for device in p_unifi_network:
-            if len(device['mac']) > 12:
-                device_data = {
-                    'cur_MAC': device['mac'],
-                    'cur_IP': device['ip'],
-                    'cur_hostname': device['hostname'],
-                    'cur_Vendor': device['vendor'],
-                    'cur_ScanMethod': 'UniFi',
-                    'cur_SatelliteID': SATELLITE_TOKEN
-                }
-                all_devices.append(device_data)
+    process_devices(p_unifi_network, 'UniFi', all_devices)
+    # OpenWRT
+    process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+
     # Arpscan
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
@@ -495,7 +624,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                 device_data = {
                     'cur_MAC': device['mac'],
                     'cur_IP': device['ip'],
-                    'cur_hostname': '(satellite network client)',
+                    'cur_hostname': resolve_device_name(device['mac'],device['ip']),
                     'cur_Vendor': device['hw'],
                     'cur_ScanMethod': 'arp-scan',
                     'cur_SatelliteID': SATELLITE_TOKEN
@@ -505,7 +634,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get Satellite MAC
     local_mac_cmd = ["/sbin/ifconfig `ip -o route get 1 | sed 's/^.*dev \\([^ ]*\\).*$/\\1/;q'` | grep ether | awk '{print $2}'"]
     local_mac = subprocess.Popen (local_mac_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
-    
+
     # Get Satellite IP
     local_ip_cmd = ["ip -o route get 1 | sed 's/^.*src \\([^ ]*\\).*$/\\1/;q'"]
     local_ip = subprocess.Popen (local_ip_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
@@ -547,6 +676,18 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get local timezone
     sat_os_timezone = tzlocal.get_localzone()
 
+    cpu_info = cpuinfo.get_cpu_info()
+
+    try:
+        cpu_brand = cpu_info['brand']
+    except KeyError:
+        cpu_brand = cpu_info['brand_raw']
+
+    try:
+        cpu_arch = cpu_info['arch']
+    except KeyError:
+        cpu_arch = cpu_info['arch_string_raw']
+
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
         'hostname': local_hostname,
@@ -556,10 +697,10 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'satellite_id': SATELLITE_TOKEN,
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
-        'cpu_name': cpuinfo.get_cpu_info()['brand'],
-        'cpu_arch': cpuinfo.get_cpu_info()['raw_arch_string'],
-        'cpu_cores': cpuinfo.get_cpu_info()['count'],
-        'cpu_freq': cpuinfo.get_cpu_info()['hz_actual'],
+        'cpu_name': cpu_brand,
+        'cpu_arch': cpu_arch,
+        'cpu_cores': cpu_info['count'],
+        'cpu_freq': cpu_info['hz_actual'],
         'ram_total': psutil.virtual_memory()[0],
         'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
@@ -572,7 +713,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_arp': ARPSCAN_ACTIVE,
         'scan_fritzbox': FRITZBOX_ACTIVE,
         'scan_mikrotik': MIKROTIK_ACTIVE,
-        'scan_unifi': UNIFI_ACTIVE
+        'scan_unifi': UNIFI_ACTIVE,
+        'scan_openwrt': OPENWRT_ACTIVE
     }]
 
     # Write Data to JSON-file

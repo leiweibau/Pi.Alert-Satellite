@@ -136,6 +136,22 @@ COLLECT_REPORTS_FOR_MAIL = 12
 EOF
 fi
 
+# 2025-01-17
+if ! grep -Fq "# OpenWRT Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# OpenWRT Configuration
+# ----------------------
+OPENWRT_ACTIVE   = False
+OPENWRT_IP       = '192.168.1.1'
+OPENWRT_USER     = 'root'
+OPENWRT_PASS     = ''
+
+
+NETWORK_DNS_SERVER    = 'localhost'
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------
@@ -182,6 +198,7 @@ check_python_version() {
     check_and_install_package "fritzconnection"
     check_and_install_package "routeros_api"
     check_and_install_package "pyunifi"
+    check_and_install_package "openwrt_luci_rpc"
   else
     print_msg "Python 3 NOT installed"
     process_error "Python 3 is required for this application"

@@ -13,6 +13,8 @@
 | SATELLITE_MASTER_URL     | This is the URL of the API to which the satellite sends its scan results. This can either be Pi.Alert directly or an external web server on which the API for proxy mode has been installed. |
 | PROXY_MODE               | Activates the proxy mode in the satellite. If the satellite informs the API that it is working in proxy mode, the API does not attempt to unpack the received data. |
 | SATELLITE_ERROR_REPORT   | This can be used to activate notification of satellite transmission errors. |
-| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place.|
+| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place. |
+| NETWORK_DNS_SERVER       | For host name resolving |
+
 
 [Back](https://github.com/leiweibau/Pi.Alert-Satellite?tab=readme-ov-file#pialert-satellite)
