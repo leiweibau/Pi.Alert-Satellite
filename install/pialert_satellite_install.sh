@@ -118,16 +118,11 @@ install_additional_dependencies() {
 # Check Python versions available
 # ------------------------------------------------------------------------------
 check_python_versions() {
-  print_msg "- Checking Python 2..."
   if [ -f /usr/bin/python ] ; then
-    print_msg "  - Python 2 is installed"
-    print_msg "    - `python -V 2>&1`"
     PYTHON2=true
   else
-    print_msg "  - Python 2 is NOT installed"
     PYTHON2=false
   fi
-  echo ""
 
   print_msg "- Checking Python 3..."
   if [ -f /usr/bin/python3 ] ; then
