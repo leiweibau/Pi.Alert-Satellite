@@ -4,7 +4,7 @@
 #  Pi.Alert Satellite
 #-------------------------------------------------------------------------------
 #  Puche 2021                                              GNU GPLv3
-#  leiweibau 2024                                          GNU GPLv3
+#  leiweibau 2024+                                         GNU GPLv3
 #-------------------------------------------------------------------------------
 
 #===============================================================================
@@ -311,7 +311,6 @@ def execute_arpscan_on_interface(SCAN_SUBNETS):
 #-------------------------------------------------------------------------------
 def read_fritzbox_active_hosts():
 
-    # check if Pi-hole is active
     if not FRITZBOX_ACTIVE :
         return
 
@@ -714,7 +713,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_arp': ARPSCAN_ACTIVE,
         'scan_fritzbox': FRITZBOX_ACTIVE,
         'scan_mikrotik': MIKROTIK_ACTIVE,
-        'scan_unifi': UNIFI_ACTIVE
+        'scan_unifi': UNIFI_ACTIVE,
+        'scan_openwrt': OPENWRT_ACTIVE
     }]
 
     # Write Data to JSON-file
