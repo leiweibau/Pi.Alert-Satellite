@@ -641,6 +641,17 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     local_hostname = socket.gethostname()
 
+    # Insert local data
+    device_data = {
+        'cur_MAC': local_mac,
+        'cur_IP': local_ip,
+        'cur_hostname': local_hostname,
+        'cur_Vendor': 'unknown',
+        'cur_ScanMethod': 'local',
+        'cur_SatelliteID': SATELLITE_TOKEN
+    }
+    all_devices.append(device_data)
+
     # Get Uptime
     monotonic_time = monotonic()
     weeks = int(monotonic_time // 604800)
