@@ -31,13 +31,15 @@ Here you can see the basic structure of the unencrypted json, which is sent encr
             "scan_arp": true,
             "scan_fritzbox": false,
             "scan_mikrotik": false,
-            "scan_unifi": false
+            "scan_unifi": false,
+            "scan_openwrt": true
         }
     ],
     "scan_results": [
         {
             "cur_MAC": "Internet - <SATELLITE_TOKEN>",
             "cur_IP": "<PUBLIC IP>",
+            "cur_hostname": "Satellite - Internet",
             "cur_Vendor": "",
             "cur_ScanMethod": "Internet Check",
             "cur_SatelliteID": "<SATELLITE_TOKEN>"
