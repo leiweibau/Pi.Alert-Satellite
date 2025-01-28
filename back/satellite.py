@@ -143,8 +143,13 @@ def parse_cron_part(cron_part, current_value, cron_min_value, cron_max_value):
 #-------------------------------------------------------------------------------
 def get_internet_IP():
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
-    cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
-    return check_IP_format (cmd_output)
+    # cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
+    # return check_IP_format (cmd_output)
+    try:
+        cmd_output = subprocess.check_output(curl_args, universal_newlines=True)
+        return check_IP_format(cmd_output)
+    except subprocess.CalledProcessError as e:
+        return None
 
 #-------------------------------------------------------------------------------
 def check_IP_format(pIP):
