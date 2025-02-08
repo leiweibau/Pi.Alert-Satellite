@@ -479,7 +479,7 @@ def read_openwrt_clients():
                 hostname = device.hostname
 
             device_data = {
-                "mac": device.mac,
+                "mac": device.mac.lower(),
                 "hostname": hostname,
                 "ip": device.ip,
                 "vendor": "(unknown)"
@@ -648,7 +648,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
 
     # Insert local data
     device_data = {
-        'cur_MAC': local_mac,
+        'cur_MAC': local_mac.lower(),
         'cur_IP': local_ip,
         'cur_hostname': local_hostname,
         'cur_Vendor': 'unknown',
