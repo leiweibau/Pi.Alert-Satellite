@@ -210,6 +210,7 @@ def query_MAC_vendor(pMAC):
 
 #-------------------------------------------------------------------------------
 def scan_network():
+    global PIHOLE6_SES_VALID
     # Header
     print('Scan Devices')
     print('    Timestamp:', startTime )
@@ -220,6 +221,10 @@ def scan_network():
     # arp-scan
     print_log ('arp-scan starts...')
     arpscan_devices = execute_arpscan()
+    print_log ('Pi-hole copy starts...')
+    copy_pihole_network()
+    if PIHOLE6_SES_VALID==True:
+        pihole_six_api_deauth()
     # Fritzbox
     print_log ('Fritzbox copy starts...')
     fritzbox_network = read_fritzbox_active_hosts()
@@ -240,6 +245,206 @@ def scan_network():
     mail_notification("scan")
 
     return 0
+
+#-------------------------------------------------------------------------------
+def copy_pihole_network():
+    # check if Pi-hole is active
+    if not PIHOLE_ACTIVE :
+        return
+
+    pihole_six_api_auth()
+    copy_pihole_network_six()
+
+#-------------------------------------------------------------------------------
+def pihole_six_api_auth():
+    global PIHOLE6_URL
+    global PIHOLE6_PASSWORD
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if not PIHOLE6_PASSWORD or not PIHOLE6_URL :
+        print('        ...Skipped (Config Error)')
+        return
+
+    if not PIHOLE6_URL.endswith('/'):
+        PIHOLE6_URL += '/'
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "User-Agent": "Pi.Alert/"+ VERSION_DATE
+    }
+    data = {
+        "password": PIHOLE6_PASSWORD
+    }
+    try:
+        response = requests.post(PIHOLE6_URL+'api/auth', headers=headers, json=data, verify=False, timeout=15)
+    except requests.exceptions.Timeout:
+        print(f"        Request timed out after 15 seconds")
+        return
+    except requests.exceptions.ConnectionError as e:
+        print(f"        Connection error occurred")
+        return
+    except Exception as e:
+        print(f"        An unexpected error occurred")
+        return
+
+    response_json = response.json()
+
+    if response_json['session']['valid'] == True :
+        PIHOLE6_SES_VALID = response_json['session']['valid']
+        PIHOLE6_SES_SID = response_json['session']['sid']
+        PIHOLE6_SES_CSRF = response_json['session']['csrf']
+    else:
+        print(f"        Auth required")
+        return
+
+#-------------------------------------------------------------------------------
+def pihole_six_api_deauth():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if not PIHOLE6_URL.endswith('/'):
+        PIHOLE6_URL += '/'
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    headers = {
+        "X-FTL-SID": PIHOLE6_SES_SID
+    }
+    try:
+        response = requests.delete(PIHOLE6_URL+'api/auth', headers=headers, verify=False, timeout=15)
+    except requests.exceptions.Timeout:
+        print(f"        Request timed out after 15 seconds")
+        return
+    except requests.exceptions.ConnectionError as e:
+        print(f"        Connection error occurred")
+        return
+    except Exception as e:
+        print(f"        An unexpected error occurred")
+        return
+
+    #print("        Pi-hole Logout")
+
+#-------------------------------------------------------------------------------
+def copy_pihole_network_six():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+    global PIHOLE6_API_MAXCLIENTS
+
+    if PIHOLE6_SES_VALID == True:
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        #max_addresses=2 IPs per host
+        raw_deviceslist = requests.get(PIHOLE6_URL+'api/network/devices?max_devices=' + str(PIHOLE6_API_MAXCLIENTS) + '&max_addresses=2', headers=headers, verify=False)
+
+        result = {}
+        deviceslist = raw_deviceslist.json()
+
+        # If pi-hole is outside the local Pi.Alert network and cannot be found with arp.
+        interfaces = get_pihole_interface_data()
+
+        for device in deviceslist['devices']:
+            hwaddr = device['hwaddr']
+            lastQuery = device['lastQuery']
+            macVendor = device['macVendor']
+
+            # skip lo interface
+            if hwaddr == "00:00:00:00:00:00":
+                continue
+
+            for ip_info in device['ips']:
+                ip = ip_info['ip']
+                name = ip_info['name'] if ip_info['name'] not in [None, ""] else "(unknown)"
+
+                # Check whether the IP could be a IPv4 address
+                if '.' in ip:
+                    # Change the “lastQuery” variable to mark the Pi-hole host as “active”
+                    for mac, localips in interfaces.items():
+                        if ip in localips:
+                            lastQuery = str(int(datetime.datetime.now().timestamp()))
+                    # Create dict of all entries
+                    result[hwaddr] = {
+                        "ip": ip,
+                        "name": name,
+                        "macVendor": macVendor,
+                        "lastQuery": lastQuery
+                    }
+
+        print(result)
+        # for hwaddr, details in result.items():
+        #     sql.execute("""
+        #         INSERT INTO PiHole_Network (PH_MAC, PH_Vendor, PH_LastQuery, PH_Name, PH_IP)
+        #         VALUES (?, ?, ?, ?, ?)
+        #     """, (hwaddr, details['macVendor'], details['lastQuery'], details['name'], details['ip']))
+
+        #deviceslist = raw_deviceslist.json()
+    else:
+        print(f"        ...Skipped")
+        return
+
+#-------------------------------------------------------------------------------
+def read_DHCP_leases():
+    # check DHCP Leases is active
+    if not DHCP_ACTIVE :
+        return
+
+    print(f"    Pi-hole DHCP Leases Method...")
+
+    if not PIHOLE6_SES_VALID == True:
+        pihole_six_api_auth()
+    read_DHCP_leases_six()
+
+#-------------------------------------------------------------------------------
+def read_DHCP_leases_six():
+    global PIHOLE6_URL
+    global PIHOLE6_PASSWORD
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if PIHOLE6_SES_VALID == True:
+
+        # sql.execute ("DELETE FROM DHCP_Leases")
+
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        raw_deviceslist = requests.get(PIHOLE6_URL+'api/dhcp/leases', headers=headers, verify=False)
+
+        result = {}
+        deviceslist = raw_deviceslist.json()
+
+        # Get Pi-hole local MAC-Adresses an IPs
+        interfaces = get_pihole_interface_data()
+        # Generate a theoretical lease period of +30min
+        current_time = datetime.datetime.now()
+        future_time = current_time + datetime.timedelta(minutes=30)
+        dnsmasq_timestamp = int(future_time.timestamp()) 
+
+        for device in deviceslist['leases']:
+            # skip lo interface if present
+            if device['hwaddr'] == "00:00:00:00:00:00":
+                continue
+
+        #     sql.execute("""INSERT INTO DHCP_Leases (DHCP_DateTime, DHCP_MAC,
+        #                         DHCP_IP, DHCP_Name, DHCP_MAC2)
+        #                             VALUES (?, ?, ?, ?, ?)
+        #                          """, (device['expires'], device['hwaddr'], device['ip'], device['name'], device['clientid']))
+
+        # sql_connection.commit()
+
+    else:
+        print(f"        ...Skipped")
+        return
 
 #-------------------------------------------------------------------------------
 def sorted_alphanumeric(data):
