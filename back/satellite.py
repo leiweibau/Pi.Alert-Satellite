@@ -222,7 +222,7 @@ def scan_network():
     print_log ('arp-scan starts...')
     arpscan_devices = execute_arpscan()
     print_log ('Pi-hole copy starts...')
-    copy_pihole_network()
+    pihole_network = copy_pihole_network()
     if PIHOLE6_SES_VALID==True:
         pihole_six_api_deauth()
     # Fritzbox
@@ -253,7 +253,8 @@ def copy_pihole_network():
         return
 
     pihole_six_api_auth()
-    copy_pihole_network_six()
+    results = copy_pihole_network_six()
+    return results
 
 #-------------------------------------------------------------------------------
 def pihole_six_api_auth():
@@ -371,21 +372,25 @@ def copy_pihole_network_six():
                         if ip in localips:
                             lastQuery = str(int(datetime.datetime.now().timestamp()))
                     # Create dict of all entries
-                    result[hwaddr] = {
+                    # result[hwaddr] = {
+                    #     "ip": ip,
+                    #     "name": name,
+                    #     "macVendor": macVendor,
+                    #     "lastQuery": lastQuery
+                    # }
+
+                    pihole_scan = {
+                        "mac": hwaddr,
                         "ip": ip,
-                        "name": name,
-                        "macVendor": macVendor,
+                        "hostname": name,
+                        "vendor": macVendor,
                         "lastQuery": lastQuery
                     }
+                    pihole_network.append(pihole_scan)
 
-        print(result)
-        # for hwaddr, details in result.items():
-        #     sql.execute("""
-        #         INSERT INTO PiHole_Network (PH_MAC, PH_Vendor, PH_LastQuery, PH_Name, PH_IP)
-        #         VALUES (?, ?, ?, ?, ?)
-        #     """, (hwaddr, details['macVendor'], details['lastQuery'], details['name'], details['ip']))
+        print(pihole_network)
 
-        #deviceslist = raw_deviceslist.json()
+        return pihole_network
     else:
         print(f"        ...Skipped")
         return
@@ -445,6 +450,36 @@ def read_DHCP_leases_six():
     else:
         print(f"        ...Skipped")
         return
+
+#-------------------------------------------------------------------------------
+def get_pihole_interface_data():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    result = {}
+    
+    if PIHOLE6_SES_VALID == True:
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        raw_interfacelist = requests.get(PIHOLE6_URL+'api/network/interfaces', headers=headers, verify=False)
+        data = raw_interfacelist.json()
+
+        for interface in data['interfaces']:
+            mac_address = interface.get('address')
+            
+            if mac_address == "00:00:00:00:00:00":
+                continue
+            
+            if 'addresses' in interface:
+                ips = [addr['address'] for addr in interface['addresses'] if addr['family'] == 'inet']
+                if mac_address and ips:
+                    result[mac_address] = ips
+
+    return result
 
 #-------------------------------------------------------------------------------
 def sorted_alphanumeric(data):
