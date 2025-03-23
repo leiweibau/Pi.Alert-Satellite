@@ -36,6 +36,10 @@ STATUS_FILE_SCAN = SATELLITE_BACK_PATH + "/.scanning"
 STATUS_FILE_BACKUP = SATELLITE_BACK_PATH + "/.backup"
 STATUS_FILE_REPORTED = SATELLITE_BACK_PATH + "/.reported"
 
+PIHOLE6_SES_VALID = ""
+PIHOLE6_SES_SID = ""
+PIHOLE6_SES_CSRF = ""
+
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
     exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
@@ -239,7 +243,7 @@ def scan_network():
     openwrt_network = read_openwrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -252,9 +256,11 @@ def copy_pihole_network():
     if not PIHOLE_ACTIVE :
         return
 
+
+    print('    Pi-hole Method...')
     pihole_six_api_auth()
-    results = copy_pihole_network_six()
-    return results
+    pihole_network = copy_pihole_network_six()
+    return pihole_network
 
 #-------------------------------------------------------------------------------
 def pihole_six_api_auth():
@@ -264,7 +270,7 @@ def pihole_six_api_auth():
     global PIHOLE6_SES_SID
     global PIHOLE6_SES_CSRF
 
-    if not PIHOLE6_PASSWORD or not PIHOLE6_URL :
+    if not PIHOLE6_URL :
         print('        ...Skipped (Config Error)')
         return
 
@@ -294,12 +300,19 @@ def pihole_six_api_auth():
 
     response_json = response.json()
 
-    if response_json['session']['valid'] == True :
-        PIHOLE6_SES_VALID = response_json['session']['valid']
-        PIHOLE6_SES_SID = response_json['session']['sid']
-        PIHOLE6_SES_CSRF = response_json['session']['csrf']
-    else:
-        print(f"        Auth required")
+    try:
+        session_data = response_json.get('session', {})
+        if session_data.get('valid', False):  # Standardwert False, falls 'valid' fehlt
+            PIHOLE6_SES_VALID = session_data['valid']
+            PIHOLE6_SES_SID = session_data['sid']
+            # to prevent key error if pihole has no password
+            if PIHOLE6_PASSWORD:
+                PIHOLE6_SES_CSRF = session_data['csrf']
+        else:
+            print("        Auth required")
+            return
+    except KeyError as e:
+        print(f"        Invalid response. Check Pi-hole URL")
         return
 
 #-------------------------------------------------------------------------------
@@ -345,12 +358,13 @@ def copy_pihole_network_six():
         }
         #max_addresses=2 IPs per host
         raw_deviceslist = requests.get(PIHOLE6_URL+'api/network/devices?max_devices=' + str(PIHOLE6_API_MAXCLIENTS) + '&max_addresses=2', headers=headers, verify=False)
-
-        result = {}
         deviceslist = raw_deviceslist.json()
+        pihole_network = []
 
         # If pi-hole is outside the local Pi.Alert network and cannot be found with arp.
         interfaces = get_pihole_interface_data()
+
+        actual_timestamp = int(time.time())
 
         for device in deviceslist['devices']:
             hwaddr = device['hwaddr']
@@ -371,24 +385,16 @@ def copy_pihole_network_six():
                     for mac, localips in interfaces.items():
                         if ip in localips:
                             lastQuery = str(int(datetime.datetime.now().timestamp()))
-                    # Create dict of all entries
-                    # result[hwaddr] = {
-                    #     "ip": ip,
-                    #     "name": name,
-                    #     "macVendor": macVendor,
-                    #     "lastQuery": lastQuery
-                    # }
 
-                    pihole_scan = {
-                        "mac": hwaddr,
-                        "ip": ip,
-                        "hostname": name,
-                        "vendor": macVendor,
-                        "lastQuery": lastQuery
-                    }
-                    pihole_network.append(pihole_scan)
-
-        print(pihole_network)
+                    # Compare the last request with the current time to filter the active hosts
+                    if int(lastQuery) > actual_timestamp-300: 
+                        pihole_scan = {
+                            "mac": hwaddr,
+                            "ip": ip,
+                            "hostname": name,
+                            "vendor": macVendor
+                        }
+                        pihole_network.append(pihole_scan)
 
         return pihole_network
     else:
@@ -398,7 +404,7 @@ def copy_pihole_network_six():
 #-------------------------------------------------------------------------------
 def read_DHCP_leases():
     # check DHCP Leases is active
-    if not DHCP_ACTIVE :
+    if not PIHOLE_DHCP_ACTIVE :
         return
 
     print(f"    Pi-hole DHCP Leases Method...")
@@ -424,8 +430,6 @@ def read_DHCP_leases_six():
             "X-FTL-CSRF": PIHOLE6_SES_CSRF
         }
         raw_deviceslist = requests.get(PIHOLE6_URL+'api/dhcp/leases', headers=headers, verify=False)
-
-        result = {}
         deviceslist = raw_deviceslist.json()
 
         # Get Pi-hole local MAC-Adresses an IPs
@@ -457,8 +461,6 @@ def get_pihole_interface_data():
     global PIHOLE6_SES_VALID
     global PIHOLE6_SES_SID
     global PIHOLE6_SES_CSRF
-
-    result = {}
     
     if PIHOLE6_SES_VALID == True:
         headers = {
@@ -467,6 +469,7 @@ def get_pihole_interface_data():
         }
         raw_interfacelist = requests.get(PIHOLE6_URL+'api/network/interfaces', headers=headers, verify=False)
         data = raw_interfacelist.json()
+        result = {}
 
         for interface in data['interfaces']:
             mac_address = interface.get('address')
@@ -837,7 +840,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network):
 
     all_devices = []
     # Internet Check
@@ -861,6 +864,10 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     process_devices(p_unifi_network, 'UniFi', all_devices)
     # OpenWRT
     process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+    # Pihole Network
+    process_devices(p_pihole_network, 'Pi-hole', all_devices)
+
+    print(p_pihole_network)
 
     # Arpscan
     if bool(p_arpscan_devices):
@@ -970,7 +977,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_fritzbox': FRITZBOX_ACTIVE,
         'scan_mikrotik': MIKROTIK_ACTIVE,
         'scan_unifi': UNIFI_ACTIVE,
-        'scan_openwrt': OPENWRT_ACTIVE
+        'scan_openwrt': OPENWRT_ACTIVE,
+        'scan_pihole_net': PIHOLE_ACTIVE,
+        'scan_pihole_dhcp': PIHOLE_DHCP_ACTIVE
     }]
 
     # Write Data to JSON-file
