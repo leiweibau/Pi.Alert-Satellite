@@ -227,6 +227,8 @@ def scan_network():
     arpscan_devices = execute_arpscan()
     print_log ('Pi-hole copy starts...')
     pihole_network = copy_pihole_network()
+    print_log ('Pi-hole DHCP copy starts...')
+    pihole_dhcp = read_DHCP_leases()
     if PIHOLE6_SES_VALID==True:
         pihole_six_api_deauth()
     # Fritzbox
@@ -411,7 +413,9 @@ def read_DHCP_leases():
 
     if not PIHOLE6_SES_VALID == True:
         pihole_six_api_auth()
-    read_DHCP_leases_six()
+    pihole_dhcp = read_DHCP_leases_six()
+
+    return pihole_dhcp
 
 #-------------------------------------------------------------------------------
 def read_DHCP_leases_six():
@@ -431,6 +435,7 @@ def read_DHCP_leases_six():
         }
         raw_deviceslist = requests.get(PIHOLE6_URL+'api/dhcp/leases', headers=headers, verify=False)
         deviceslist = raw_deviceslist.json()
+        pihole_dhcp = []
 
         # Get Pi-hole local MAC-Adresses an IPs
         interfaces = get_pihole_interface_data()
@@ -444,12 +449,16 @@ def read_DHCP_leases_six():
             if device['hwaddr'] == "00:00:00:00:00:00":
                 continue
 
-        #     sql.execute("""INSERT INTO DHCP_Leases (DHCP_DateTime, DHCP_MAC,
-        #                         DHCP_IP, DHCP_Name, DHCP_MAC2)
-        #                             VALUES (?, ?, ?, ?, ?)
-        #                          """, (device['expires'], device['hwaddr'], device['ip'], device['name'], device['clientid']))
+            # if int(lastQuery) > actual_timestamp-300: 
+            pihole_scan = {
+                "mac": device['hwaddr'],
+                "ip": device['ip'],
+                "hostname": device['name'],
+                "vendor": "(unknown)"
+            }
+            pihole_dhcp.append(pihole_scan)
 
-        # sql_connection.commit()
+        return pihole_dhcp
 
     else:
         print(f"        ...Skipped")
