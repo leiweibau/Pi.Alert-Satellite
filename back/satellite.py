@@ -245,7 +245,7 @@ def scan_network():
     openwrt_network = read_openwrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network, pihole_dhcp)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -427,8 +427,6 @@ def read_DHCP_leases_six():
 
     if PIHOLE6_SES_VALID == True:
 
-        # sql.execute ("DELETE FROM DHCP_Leases")
-
         headers = {
             "X-FTL-SID": PIHOLE6_SES_SID,
             "X-FTL-CSRF": PIHOLE6_SES_CSRF
@@ -449,14 +447,22 @@ def read_DHCP_leases_six():
             if device['hwaddr'] == "00:00:00:00:00:00":
                 continue
 
-            # if int(lastQuery) > actual_timestamp-300: 
             pihole_scan = {
+                "expires": device['expires'],
                 "mac": device['hwaddr'],
                 "ip": device['ip'],
-                "hostname": device['name'],
-                "vendor": "(unknown)"
+                "hostname": device['name']
             }
             pihole_dhcp.append(pihole_scan)
+
+
+        # pihole_scan = {
+        #     "expires": 234442221,
+        #     "mac": 'ww:ww:rr:11:11:22',
+        #     "ip": '22.55.33.11',
+        #     "hostname": 'DemoHost'
+        # }
+        # pihole_dhcp.append(pihole_scan)
 
         return pihole_dhcp
 
@@ -849,7 +855,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network, p_pihole_dhcp):
 
     all_devices = []
     # Internet Check
@@ -875,8 +881,20 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     process_devices(p_openwrt_network, 'OpenWRT', all_devices)
     # Pihole Network
     process_devices(p_pihole_network, 'Pi-hole', all_devices)
-
-    print(p_pihole_network)
+    # Pihole Network
+    if bool(p_pihole_dhcp):
+        for device in p_pihole_dhcp:
+            if len(device['mac']) > 12:
+                device_data = {
+                    'cur_expires': device['expires'],
+                    'cur_hwaddr': device['mac'],
+                    'cur_ip': device['ip'],
+                    'cur_name': device['hostname'],
+                    'cur_clientid': '*',
+                    'cur_ScanMethod': 'Pi-hole DHCP',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     # Arpscan
     if bool(p_arpscan_devices):
@@ -906,7 +924,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     device_data = {
         'cur_MAC': local_mac.lower(),
         'cur_IP': local_ip,
-        'cur_hostname': local_hostname,
+        'cur_hostname': 'Satellite - ' + local_hostname,
         'cur_Vendor': 'unknown',
         'cur_ScanMethod': 'local',
         'cur_SatelliteID': SATELLITE_TOKEN
@@ -1007,10 +1025,8 @@ def encrypt_submit_scandata(json_data):
         print('    Proxy-Mode enabled')
 
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
     # Convert the dictionary to JSON and then to binary data
     enc_json_data = json.dumps(json_data).encode('utf-8')
-
     # OpenSSL command for encrypting the data
     openssl_command = [
         "openssl", "enc", "-aes-256-cbc", "-salt", "-out", SATELLITE_BACK_PATH + "/encrypted_scandata", "-pbkdf2",
@@ -1029,7 +1045,6 @@ def encrypt_submit_scandata(json_data):
         encrypted_data = f.read()
 
     transfer_mode = "proxy" if PROXY_MODE else "direct"
-
     # The data for the API requeste
     post_data = {
         "token": SATELLITE_TOKEN,
@@ -1039,17 +1054,13 @@ def encrypt_submit_scandata(json_data):
     files = {
         "encrypted_data": ("encrypted_scandata", encrypted_data)
     }
-
     # API-URL
     api_url = SATELLITE_MASTER_URL
-
     # Send the request to the API, deactivating SSL verification in the process
     response = requests.post(api_url, data=post_data, files=files, verify=False)
-
     try:
         response_data = response.json()
         print(f"    API-Response: {response_data}")
-
         # if statuscode != 0 save Logs
         if response_data.get('status') != '0':
             save_error(response_data)
