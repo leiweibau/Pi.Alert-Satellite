@@ -19,6 +19,7 @@ The API is installed on a separate web server. The satellite now transmits the d
   - **Fritzbox**. If you use a Fritzbox (a router from the company "AVM"), it is possible to perform a query of the active hosts. This also includes hosts of the guest WLAN and Powerline devices from "AVM".
   - **Mikrotik**. If you use Mikrotik Router as DHCP server, it is possible to read DHCP leases.
   - **UniFi**. If you use UniFi controller, it is possible to read clients (Client Devices)
+  - **OpenWRT**. If you are using a router based on OpenWRT, you can import the active devices.
 
 ### Installation
 <!--- --------------------------------------------------------------------- --->

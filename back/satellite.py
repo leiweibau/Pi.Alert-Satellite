@@ -36,6 +36,10 @@ STATUS_FILE_SCAN = SATELLITE_BACK_PATH + "/.scanning"
 STATUS_FILE_BACKUP = SATELLITE_BACK_PATH + "/.backup"
 STATUS_FILE_REPORTED = SATELLITE_BACK_PATH + "/.reported"
 
+PIHOLE6_SES_VALID = ""
+PIHOLE6_SES_SID = ""
+PIHOLE6_SES_CSRF = ""
+
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
     exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
@@ -143,8 +147,13 @@ def parse_cron_part(cron_part, current_value, cron_min_value, cron_max_value):
 #-------------------------------------------------------------------------------
 def get_internet_IP():
     curl_args = ['curl', '-s', QUERY_MYIP_SERVER]
-    cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
-    return check_IP_format (cmd_output)
+    # cmd_output = subprocess.check_output (curl_args, universal_newlines=True)
+    # return check_IP_format (cmd_output)
+    try:
+        cmd_output = subprocess.check_output(curl_args, universal_newlines=True)
+        return check_IP_format(cmd_output)
+    except subprocess.CalledProcessError as e:
+        return None
 
 #-------------------------------------------------------------------------------
 def check_IP_format(pIP):
@@ -205,6 +214,7 @@ def query_MAC_vendor(pMAC):
 
 #-------------------------------------------------------------------------------
 def scan_network():
+    global PIHOLE6_SES_VALID
     # Header
     print('Scan Devices')
     print('    Timestamp:', startTime )
@@ -215,6 +225,12 @@ def scan_network():
     # arp-scan
     print_log ('arp-scan starts...')
     arpscan_devices = execute_arpscan()
+    print_log ('Pi-hole copy starts...')
+    pihole_network = copy_pihole_network()
+    print_log ('Pi-hole DHCP copy starts...')
+    pihole_dhcp = read_DHCP_leases()
+    if PIHOLE6_SES_VALID==True:
+        pihole_six_api_deauth()
     # Fritzbox
     print_log ('Fritzbox copy starts...')
     fritzbox_network = read_fritzbox_active_hosts()
@@ -229,12 +245,259 @@ def scan_network():
     openwrt_network = read_openwrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network, pihole_dhcp)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
 
     return 0
+
+#-------------------------------------------------------------------------------
+def copy_pihole_network():
+    # check if Pi-hole is active
+    if not PIHOLE_ACTIVE :
+        return
+
+
+    print('    Pi-hole Method...')
+    pihole_six_api_auth()
+    pihole_network = copy_pihole_network_six()
+    return pihole_network
+
+#-------------------------------------------------------------------------------
+def pihole_six_api_auth():
+    global PIHOLE6_URL
+    global PIHOLE6_PASSWORD
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if not PIHOLE6_URL :
+        print('        ...Skipped (Config Error)')
+        return
+
+    if not PIHOLE6_URL.endswith('/'):
+        PIHOLE6_URL += '/'
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "User-Agent": "Pi.Alert/"+ VERSION_DATE
+    }
+    data = {
+        "password": PIHOLE6_PASSWORD
+    }
+    try:
+        response = requests.post(PIHOLE6_URL+'api/auth', headers=headers, json=data, verify=False, timeout=15)
+    except requests.exceptions.Timeout:
+        print(f"        Request timed out after 15 seconds")
+        return
+    except requests.exceptions.ConnectionError as e:
+        print(f"        Connection error occurred")
+        return
+    except Exception as e:
+        print(f"        An unexpected error occurred")
+        return
+
+    response_json = response.json()
+
+    try:
+        session_data = response_json.get('session', {})
+        if session_data.get('valid', False):  # Standardwert False, falls 'valid' fehlt
+            PIHOLE6_SES_VALID = session_data['valid']
+            PIHOLE6_SES_SID = session_data['sid']
+            # to prevent key error if pihole has no password
+            if PIHOLE6_PASSWORD:
+                PIHOLE6_SES_CSRF = session_data['csrf']
+        else:
+            print("        Auth required")
+            return
+    except KeyError as e:
+        print(f"        Invalid response. Check Pi-hole URL")
+        return
+
+#-------------------------------------------------------------------------------
+def pihole_six_api_deauth():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if not PIHOLE6_URL.endswith('/'):
+        PIHOLE6_URL += '/'
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    headers = {
+        "X-FTL-SID": PIHOLE6_SES_SID
+    }
+    try:
+        response = requests.delete(PIHOLE6_URL+'api/auth', headers=headers, verify=False, timeout=15)
+    except requests.exceptions.Timeout:
+        print(f"        Request timed out after 15 seconds")
+        return
+    except requests.exceptions.ConnectionError as e:
+        print(f"        Connection error occurred")
+        return
+    except Exception as e:
+        print(f"        An unexpected error occurred")
+        return
+
+    #print("        Pi-hole Logout")
+
+#-------------------------------------------------------------------------------
+def copy_pihole_network_six():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+    global PIHOLE6_API_MAXCLIENTS
+
+    if PIHOLE6_SES_VALID == True:
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        #max_addresses=2 IPs per host
+        raw_deviceslist = requests.get(PIHOLE6_URL+'api/network/devices?max_devices=' + str(PIHOLE6_API_MAXCLIENTS) + '&max_addresses=2', headers=headers, verify=False)
+        deviceslist = raw_deviceslist.json()
+        pihole_network = []
+
+        # If pi-hole is outside the local Pi.Alert network and cannot be found with arp.
+        interfaces = get_pihole_interface_data()
+
+        actual_timestamp = int(time.time())
+
+        for device in deviceslist['devices']:
+            hwaddr = device['hwaddr']
+            lastQuery = device['lastQuery']
+            macVendor = device['macVendor']
+
+            # skip lo interface
+            if hwaddr == "00:00:00:00:00:00":
+                continue
+
+            for ip_info in device['ips']:
+                ip = ip_info['ip']
+                name = ip_info['name'] if ip_info['name'] not in [None, ""] else "(unknown)"
+
+                # Check whether the IP could be a IPv4 address
+                if '.' in ip:
+                    # Change the “lastQuery” variable to mark the Pi-hole host as “active”
+                    for mac, localips in interfaces.items():
+                        if ip in localips:
+                            lastQuery = str(int(datetime.datetime.now().timestamp()))
+
+                    # Compare the last request with the current time to filter the active hosts
+                    if int(lastQuery) > actual_timestamp-300: 
+                        pihole_scan = {
+                            "mac": hwaddr,
+                            "ip": ip,
+                            "hostname": name,
+                            "vendor": macVendor
+                        }
+                        pihole_network.append(pihole_scan)
+
+        return pihole_network
+    else:
+        print(f"        ...Skipped")
+        return
+
+#-------------------------------------------------------------------------------
+def read_DHCP_leases():
+    # check DHCP Leases is active
+    if not PIHOLE_DHCP_ACTIVE :
+        return
+
+    print(f"    Pi-hole DHCP Leases Method...")
+
+    if not PIHOLE6_SES_VALID == True:
+        pihole_six_api_auth()
+    pihole_dhcp = read_DHCP_leases_six()
+
+    return pihole_dhcp
+
+#-------------------------------------------------------------------------------
+def read_DHCP_leases_six():
+    global PIHOLE6_URL
+    global PIHOLE6_PASSWORD
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+
+    if PIHOLE6_SES_VALID == True:
+
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        raw_deviceslist = requests.get(PIHOLE6_URL+'api/dhcp/leases', headers=headers, verify=False)
+        deviceslist = raw_deviceslist.json()
+        pihole_dhcp = []
+
+        # Get Pi-hole local MAC-Adresses an IPs
+        interfaces = get_pihole_interface_data()
+        # Generate a theoretical lease period of +30min
+        current_time = datetime.datetime.now()
+        future_time = current_time + datetime.timedelta(minutes=30)
+        dnsmasq_timestamp = int(future_time.timestamp()) 
+
+        for device in deviceslist['leases']:
+            # skip lo interface if present
+            if device['hwaddr'] == "00:00:00:00:00:00":
+                continue
+
+            pihole_scan = {
+                "expires": device['expires'],
+                "mac": device['hwaddr'],
+                "ip": device['ip'],
+                "hostname": device['name']
+            }
+            pihole_dhcp.append(pihole_scan)
+
+
+        # pihole_scan = {
+        #     "expires": 234442221,
+        #     "mac": 'ww:ww:rr:11:11:22',
+        #     "ip": '22.55.33.11',
+        #     "hostname": 'DemoHost'
+        # }
+        # pihole_dhcp.append(pihole_scan)
+
+        return pihole_dhcp
+
+    else:
+        print(f"        ...Skipped")
+        return
+
+#-------------------------------------------------------------------------------
+def get_pihole_interface_data():
+    global PIHOLE6_URL
+    global PIHOLE6_SES_VALID
+    global PIHOLE6_SES_SID
+    global PIHOLE6_SES_CSRF
+    
+    if PIHOLE6_SES_VALID == True:
+        headers = {
+            "X-FTL-SID": PIHOLE6_SES_SID,
+            "X-FTL-CSRF": PIHOLE6_SES_CSRF
+        }
+        raw_interfacelist = requests.get(PIHOLE6_URL+'api/network/interfaces', headers=headers, verify=False)
+        data = raw_interfacelist.json()
+        result = {}
+
+        for interface in data['interfaces']:
+            mac_address = interface.get('address')
+            
+            if mac_address == "00:00:00:00:00:00":
+                continue
+            
+            if 'addresses' in interface:
+                ips = [addr['address'] for addr in interface['addresses'] if addr['family'] == 'inet']
+                if mac_address and ips:
+                    result[mac_address] = ips
+
+    return result
 
 #-------------------------------------------------------------------------------
 def sorted_alphanumeric(data):
@@ -474,7 +737,7 @@ def read_openwrt_clients():
                 hostname = device.hostname
 
             device_data = {
-                "mac": device.mac,
+                "mac": device.mac.lower(),
                 "hostname": hostname,
                 "ip": device.ip,
                 "vendor": "(unknown)"
@@ -592,7 +855,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network, p_pihole_dhcp):
 
     all_devices = []
     # Internet Check
@@ -616,6 +879,22 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     process_devices(p_unifi_network, 'UniFi', all_devices)
     # OpenWRT
     process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+    # Pihole Network
+    process_devices(p_pihole_network, 'Pi-hole', all_devices)
+    # Pihole Network
+    if bool(p_pihole_dhcp):
+        for device in p_pihole_dhcp:
+            if len(device['mac']) > 12:
+                device_data = {
+                    'cur_expires': device['expires'],
+                    'cur_hwaddr': device['mac'],
+                    'cur_ip': device['ip'],
+                    'cur_name': device['hostname'],
+                    'cur_clientid': '*',
+                    'cur_ScanMethod': 'Pi-hole DHCP',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                }
+                all_devices.append(device_data)
 
     # Arpscan
     if bool(p_arpscan_devices):
@@ -640,6 +919,17 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     local_ip = subprocess.Popen (local_ip_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0].decode().strip()
 
     local_hostname = socket.gethostname()
+
+    # Insert local data
+    device_data = {
+        'cur_MAC': local_mac.lower(),
+        'cur_IP': local_ip,
+        'cur_hostname': 'Satellite - ' + local_hostname,
+        'cur_Vendor': 'unknown',
+        'cur_ScanMethod': 'local',
+        'cur_SatelliteID': SATELLITE_TOKEN
+    }
+    all_devices.append(device_data)
 
     # Get Uptime
     monotonic_time = monotonic()
@@ -714,7 +1004,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_fritzbox': FRITZBOX_ACTIVE,
         'scan_mikrotik': MIKROTIK_ACTIVE,
         'scan_unifi': UNIFI_ACTIVE,
-        'scan_openwrt': OPENWRT_ACTIVE
+        'scan_openwrt': OPENWRT_ACTIVE,
+        'scan_pihole_net': PIHOLE_ACTIVE,
+        'scan_pihole_dhcp': PIHOLE_DHCP_ACTIVE
     }]
 
     # Write Data to JSON-file
@@ -733,10 +1025,8 @@ def encrypt_submit_scandata(json_data):
         print('    Proxy-Mode enabled')
 
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
     # Convert the dictionary to JSON and then to binary data
     enc_json_data = json.dumps(json_data).encode('utf-8')
-
     # OpenSSL command for encrypting the data
     openssl_command = [
         "openssl", "enc", "-aes-256-cbc", "-salt", "-out", SATELLITE_BACK_PATH + "/encrypted_scandata", "-pbkdf2",
@@ -755,7 +1045,6 @@ def encrypt_submit_scandata(json_data):
         encrypted_data = f.read()
 
     transfer_mode = "proxy" if PROXY_MODE else "direct"
-
     # The data for the API requeste
     post_data = {
         "token": SATELLITE_TOKEN,
@@ -765,17 +1054,13 @@ def encrypt_submit_scandata(json_data):
     files = {
         "encrypted_data": ("encrypted_scandata", encrypted_data)
     }
-
     # API-URL
     api_url = SATELLITE_MASTER_URL
-
     # Send the request to the API, deactivating SSL verification in the process
     response = requests.post(api_url, data=post_data, files=files, verify=False)
-
     try:
         response_data = response.json()
         print(f"    API-Response: {response_data}")
-
         # if statuscode != 0 save Logs
         if response_data.get('status') != '0':
             save_error(response_data)

@@ -23,6 +23,14 @@ COLLECT_REPORTS_FOR_MAIL   = 12
 
 ```
 
+
+To test the mail configuration, you can send a test mail in the “back” directory in the Pi.Alert Satallite directory (e.g. “$HOME/pialert_satellite”).
+
+```
+cd $HOME/pialert_satellite/back 
+python3 satellite.py email_test`
+```
+
 [Gmail Support Document](https://support.google.com/accounts/answer/185833?p=InvalidSecondFactor)
 
 [iCloud Support Document](https://support.apple.com/en-us/102654)

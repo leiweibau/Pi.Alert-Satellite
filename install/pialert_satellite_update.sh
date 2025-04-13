@@ -2,8 +2,7 @@
 # ------------------------------------------------------------------------------
 #  pialert_satellite_update.sh - Update script
 # ------------------------------------------------------------------------------
-#  Puche 2021        pi.alert.application@gmail.com        GNU GPLv3
-#  leiweibau 2023                                          GNU GPLv3
+#  leiweibau 2024+                                         GNU GPLv3
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
@@ -149,6 +148,20 @@ OPENWRT_PASS     = ''
 
 
 NETWORK_DNS_SERVER    = 'localhost'
+EOF
+fi
+
+# 2025-04-13
+if ! grep -Fq "# Pi-hole Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# Pi-hole Configuration
+# ----------------------
+PIHOLE_ACTIVE              = False
+PIHOLE_DHCP_ACTIVE         = False
+PIHOLE6_URL                = ''
+PIHOLE6_PASSWORD           = ''
+PIHOLE6_API_MAXCLIENTS     = 100
 EOF
 fi
 
