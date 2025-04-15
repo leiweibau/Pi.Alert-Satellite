@@ -13,8 +13,70 @@
 | SATELLITE_MASTER_URL     | This is the URL of the API to which the satellite sends its scan results. This can either be Pi.Alert directly or an external web server on which the API for proxy mode has been installed. |
 | PROXY_MODE               | Activates the proxy mode in the satellite. If the satellite informs the API that it is working in proxy mode, the API does not attempt to unpack the received data. |
 | SATELLITE_ERROR_REPORT   | This can be used to activate notification of satellite transmission errors. |
-| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place. |
 | NETWORK_DNS_SERVER       | For host name resolving |
 
+
+#### Mail-Account Settings
+
+| Option                   | Description |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| SMTP_SERVER              | Address of the e-mail server (e.g. smtp.gmail.com)                                                                                                |
+| SMTP_PORT                | The port of the SMTP server. The port may vary depending on the server configuration.                                                             |
+| SMTP_USER                | User name                                                                                                                                         |
+| SMTP_PASS                | Password                                                                                                                                          |
+| SMTP_SKIP_TLS            | If this entry is set to True, transport encryption of the e-mail is enabled. If the server does not support this, the entry must be set to False. |
+| SMTP_SKIP_LOGIN          | There are SMTP servers which do not require a login. In such a case, this value can be set to True.                                               |
+| MAIL_TO                  | destination@example.com
+| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place. |
+
+#### Fritzbox Configuration
+
+| Option          | Description |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| FRITZBOX_ACTIVE | If a Fritzbox is used in the network, it can be used as a data source. This can be activated or deactivated at this point.                                  |
+| FRITZBOX_IP     | IP address of the Fritzbox.                                                                                                                                 |
+| FRITZBOX_USER   | This assumes that the Fritzbox is configured for a login with username and password, instead of password only. A login with password only is not supported. |
+| FRITZBOX_PASS   | Password                                                                                                                                                    |
+
+
+#### Mikrotik Configuration
+
+| Option          | Description |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------|
+| MIKROTIK_ACTIVE | If a Mikrotik router is used in the network, it can be used as a data source. This can be enabled or disabled at this point. |
+| MIKROTIK_IP     | IP address of the Mikrotik router.                                                                                           |
+| MIKROTIK_USER   | Username                                                                                                                     |
+| MIKROTIK_PASS   | Password                                                                                                                     |
+
+
+#### UniFi Configuration
+
+| Option       | Description |
+|--------------|---------------------------------------------------------------------------------------------------------------------------|
+| UNIFI_ACTIVE | If a UniFi system is used in the network, it can be used as a data source. This can be enabled or disabled at this point. |
+| UNIFI_IP     | IP address of the Unifi system.                                                                                           |
+| UNIFI_API    | Possible UNIFI APIs are v4, v5, unifiOS, UDMP-unifiOS, default                                                            |
+| UNIFI_USER   | Username                                                                                                                  |
+| UNIFI_PASS   | Password                                                                                                                  |
+
+
+#### OpenWRT Configuration
+
+| Option         | Description |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| OPENWRT_ACTIVE | The package `luci-mod-rpc`need to be installed, on your OpenWrt router. If a OpenWRT is used in the network, it can be used as a data source. This can be activated or deactivated at this point. |
+| OPENWRT_IP     | IP address of the OpenWRT router.                                                                                                                                                                 |
+| OPENWRT_USER   | Username                                                                                                                                                                                          |
+| OPENWRT_PASS   | Password   
+
+#### Pi-hole Configuration
+
+| Option                   | Description |
+|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PIHOLE_ACTIVE            | This variable is set during installation.                                                                                                                                   |
+| PIHOLE_DHCP_ACTIVE       | This variable is valid for the DHCP server of Pihole 5.x as well as for 6.x                                                                                                 |
+| PIHOLE6_URL              | If you want to access the Pi-hole data of version 6, enter the URL to the web interface (without the "/admin" suffix) here.                                                 |
+| PIHOLE6_PASSWORD         | Enter the password for the Pi-hole web interface here.                                                                                                                      |
+| PIHOLE6_API_MAXCLIENTS   | Specifies the maximum number of clients that are returned as a response from the API                                                                                        |
 
 [Back](https://github.com/leiweibau/Pi.Alert-Satellite?tab=readme-ov-file#pialert-satellite)
