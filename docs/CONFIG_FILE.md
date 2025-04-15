@@ -13,8 +13,21 @@
 | SATELLITE_MASTER_URL     | This is the URL of the API to which the satellite sends its scan results. This can either be Pi.Alert directly or an external web server on which the API for proxy mode has been installed. |
 | PROXY_MODE               | Activates the proxy mode in the satellite. If the satellite informs the API that it is working in proxy mode, the API does not attempt to unpack the received data. |
 | SATELLITE_ERROR_REPORT   | This can be used to activate notification of satellite transmission errors. |
-| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place. |
 | NETWORK_DNS_SERVER       | For host name resolving |
+
+
+#### Mail-Account Settings
+
+| Option                   | Description |
+|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| SMTP_SERVER              | Address of the e-mail server (e.g. smtp.gmail.com)                                                                                                |
+| SMTP_PORT                | The port of the SMTP server. The port may vary depending on the server configuration.                                                             |
+| SMTP_USER                | User name                                                                                                                                         |
+| SMTP_PASS                | Password                                                                                                                                          |
+| SMTP_SKIP_TLS            | If this entry is set to True, transport encryption of the e-mail is enabled. If the server does not support this, the entry must be set to False. |
+| SMTP_SKIP_LOGIN          | There are SMTP servers which do not require a login. In such a case, this value can be set to True.                                               |
+| MAIL_TO                  | destination@example.com
+| COLLECT_REPORTS_FOR_MAIL | This parameter defines the threshold at which notification of transmission errors takes place. The saved logs are attached to the mail. After this mail, further error notifications are stopped until a successful transmission has taken place. |
 
 
 [Back](https://github.com/leiweibau/Pi.Alert-Satellite?tab=readme-ov-file#pialert-satellite)
