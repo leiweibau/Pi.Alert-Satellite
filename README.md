@@ -20,7 +20,8 @@ The API is installed on a separate web server. The satellite now transmits the d
   - **Mikrotik**. If you use Mikrotik Router as DHCP server, it is possible to read DHCP leases.
   - **UniFi**. If you use UniFi controller, it is possible to read clients (Client Devices)
   - **OpenWRT**. If you are using a router based on OpenWRT, you can import the active devices.
-
+  - **Pi-hole DNS**. If the Pi-hole v6 DNS server is active, Pi.Alert examines its activity looking for active devices using DNS that have not been detected by other methods.
+  - **Pi-hole DHCP**. If the Pi-hole v6 DHCP server is active, Pi.Alert examines the DHCP leases (addresses assigned) to find devices that were not discovered by the other methods.
 ### Installation
 <!--- --------------------------------------------------------------------- --->
 Initially designed to run on a Debian based Linux distribution. 
