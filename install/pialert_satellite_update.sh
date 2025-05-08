@@ -165,6 +165,20 @@ PIHOLE6_API_MAXCLIENTS     = 100
 EOF
 fi
 
+# 2025-05-08
+if ! grep -Fq "# AsusWRT Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# AsusWRT Configuration
+# ----------------------
+ASUSWRT_ACTIVE            = False
+ASUSWRT_IP                = '192.168.50.1'
+ASUSWRT_USER              = 'root'
+ASUSWRT_PASS              = ''
+ASUSWRT_SSL               = False
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------

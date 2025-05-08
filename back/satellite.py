@@ -1005,6 +1005,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_mikrotik': MIKROTIK_ACTIVE,
         'scan_unifi': UNIFI_ACTIVE,
         'scan_openwrt': OPENWRT_ACTIVE,
+        'scan_asuswrt': ASUSWRT_ACTIVE,
         'scan_pihole_net': PIHOLE_ACTIVE,
         'scan_pihole_dhcp': PIHOLE_DHCP_ACTIVE
     }]
