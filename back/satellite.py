@@ -24,7 +24,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal, asyncio, aiohttp
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -243,9 +243,12 @@ def scan_network():
     # OpenWRT
     print_log ('OpenWRT copy starts...')
     openwrt_network = read_openwrt_clients()
+    # AsusWRT
+    print_log ('AsusWRT copy starts...')
+    asuswrt_network = read_asuswrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network, pihole_dhcp)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -750,6 +753,102 @@ def read_openwrt_clients():
     return openwrt_network
 
 #-------------------------------------------------------------------------------
+def read_asuswrt_clients():
+
+    if not ASUSWRT_ACTIVE:
+        return
+
+    print('    AsusWRT Method...')
+
+    asuswrt_network = []
+
+    try:
+        from asusrouter import AsusRouter
+        from asusrouter.modules.data import AsusData
+    except:
+        print('        Missing python package')
+        return
+
+    try:
+        attempt = 0
+        max_attempts = 5
+
+        result = None
+        while not result and attempt < max_attempts:
+            result = asyncio.run(collect_asuswrt_data(AsusRouter, AsusData))
+            attempt += 1
+            if not result:
+                asyncio.run(asyncio.sleep(5))  # 5 sec delay
+
+        if not result:
+            print(f"        No results received after {max_attempts} attempts")
+
+
+        for client in result.values():
+            hostname = client["name"] or "(unknown)"
+            mac = client["mac"]
+            vendor = client["vendor"]
+            if vendor == "None" or vendor is None:
+                vendor = "(unknown)"
+            ip_method = client["ip_method"]
+
+            device_data = {
+                "mac": mac.lower(),
+                "hostname": hostname,
+                "ip": client["ip_address"],
+                "vendor": vendor,
+                "ip_method": ip_method
+            }
+            asuswrt_network.append(device_data)
+
+    except Exception as e:
+        print(f"        ...Skipped. Could not connect to Asus Router")
+
+    return asuswrt_network
+
+#-------------------------------------------------------------------------------
+async def collect_asuswrt_data(AsusRouter,AsusData):
+    async with aiohttp.ClientSession() as session:
+        router = AsusRouter(
+            hostname=ASUSWRT_IP,
+            username=ASUSWRT_USER,
+            password=ASUSWRT_PASS,
+            use_ssl=ASUSWRT_SSL,
+            cache_time=2, 
+            session=session,
+        )
+
+        connected = await router.async_connect()
+        # print(f"Verbindung erfolgreich: {connected}")
+        if not connected:
+            return
+
+        try:
+            clients_data = await router.async_get_data(AsusData.CLIENTS)
+            
+            filtered_clients = {
+                mac: {
+                    'name': client.description.name,
+                    'ip_address': client.connection.ip_address,
+                    'mac': mac,
+                    'vendor': client.description.vendor,
+                    'ip_method': client.connection.ip_method.name
+                }
+                for mac, client in clients_data.items() if client.connection.online
+            }
+
+            if filtered_clients:
+                return filtered_clients
+            else:
+                return {}
+        
+        except Exception as e:
+            print(f"        Connection error occurred: {e}")
+
+        await router.async_disconnect()
+        # print("\nVerbindung sauber getrennt.")
+
+#-------------------------------------------------------------------------------
 def resolve_device_name_netbios(pIP):
     try:
         nbtscan_args =['nbtscan', '-v', '-s', ':', pIP+'/32']
@@ -855,7 +954,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network, p_pihole_dhcp):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp):
 
     all_devices = []
     # Internet Check
@@ -879,6 +978,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     process_devices(p_unifi_network, 'UniFi', all_devices)
     # OpenWRT
     process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+    # AsusWRT
+    process_devices(p_asuswrt_network, 'AsusWRT', all_devices)
     # Pihole Network
     process_devices(p_pihole_network, 'Pi-hole', all_devices)
     # Pihole Network
