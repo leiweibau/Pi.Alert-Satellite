@@ -112,6 +112,13 @@ install_additional_dependencies() {
     pip3 -q install asusrouter --no-warn-script-location                                      2>&1 >> "$LOG"
   fi
 
+  print_msg "- Update 'requests' package to 2.31.0"
+  if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
+    pip3 -q install "requests>=2.31.0" --break-system-packages --no-warn-script-location       2>&1 >> "$LOG"
+  else
+    pip3 -q install "requests>=2.31.0" --no-warn-script-location                               2>&1 >> "$LOG"
+  fi
+
   PYTHON_BIN="python3"
 
 }
