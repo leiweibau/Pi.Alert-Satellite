@@ -298,9 +298,11 @@ def pihole_six_api_auth():
         return
     except requests.exceptions.ConnectionError as e:
         print(f"        Connection error occurred")
+        print_log (f"{e}")
         return
     except Exception as e:
         print(f"        An unexpected error occurred")
+        print_log (f"{e}")
         return
 
     response_json = response.json()
@@ -318,6 +320,7 @@ def pihole_six_api_auth():
             return
     except KeyError as e:
         print(f"        Invalid response. Check Pi-hole URL")
+        print_log(f"{e}")
         return
 
 #-------------------------------------------------------------------------------
@@ -341,9 +344,11 @@ def pihole_six_api_deauth():
         return
     except requests.exceptions.ConnectionError as e:
         print(f"        Connection error occurred")
+        print_log(f"{e}")
         return
     except Exception as e:
         print(f"        An unexpected error occurred")
+        print_log(f"{e}")
         return
 
     #print("        Pi-hole Logout")
@@ -458,7 +463,7 @@ def read_DHCP_leases_six():
             }
             pihole_dhcp.append(pihole_scan)
 
-
+        # DEBUG
         # pihole_scan = {
         #     "expires": 234442221,
         #     "mac": 'ww:ww:rr:11:11:22',
@@ -590,27 +595,32 @@ def read_fritzbox_active_hosts():
         print('        Missing python package')
         return fritzbox_network
 
-    # copy Fritzbox Network list
-    fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
-    hosts = fh.get_hosts_info()
-    for index, host in enumerate(hosts, start=1):
-        if host['status'] :
-            # status = 'active' if host['status'] else  '-'
-            ip = host['ip'] if host['ip'] else 'no IP'
-            mac = host['mac'].lower() if host['mac'] else '-'
-            hostname = host['name']
-            try:
-                vendor = MacLookup().lookup(host['mac'])
-            except:
-                vendor = "Prefix is not registered"
+    try:
+        # copy Fritzbox Network list
+        fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
+        hosts = fh.get_hosts_info()
+        for index, host in enumerate(hosts, start=1):
+            if host['status'] :
+                # status = 'active' if host['status'] else  '-'
+                ip = host['ip'] if host['ip'] else 'no IP'
+                mac = host['mac'].lower() if host['mac'] else '-'
+                hostname = host['name']
+                try:
+                    vendor = MacLookup().lookup(host['mac'])
+                except:
+                    vendor = "Prefix is not registered"
 
-            fritzbox_scan = {
-                "mac": mac,
-                "ip": ip,
-                "hostname": hostname,
-                "vendor": vendor
-            }
-            fritzbox_network.append(fritzbox_scan)
+                fritzbox_scan = {
+                    "mac": mac,
+                    "ip": ip,
+                    "hostname": hostname,
+                    "vendor": vendor
+                }
+                fritzbox_network.append(fritzbox_scan)
+    except Exception as e:
+        print('        Could not connect to Fritzbox')
+        print_log(f"{e}")
+
     return fritzbox_network
 
 #-------------------------------------------------------------------------------
@@ -629,29 +639,33 @@ def read_mikrotik_leases():
         print('        Missing python package')
         return mikrotik_network
 
-    data = []
-    conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
-    api = conn.get_api()
-    ret = api.get_resource('/ip/dhcp-server/lease').get()
-    conn.disconnect()
-    for row in ret:
-        if 'active-mac-address' in row:
-            mac = row['active-mac-address'].lower()
-            ip = row['active-address']
-            hostname = row.get('host-name','')
-            try:
-                vendor = MacLookup().lookup(mac)
-            except:
-                vendor = "Prefix is not registered"
+    try:
+        data = []
+        conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
+        api = conn.get_api()
+        ret = api.get_resource('/ip/dhcp-server/lease').get()
+        conn.disconnect()
+        for row in ret:
+            if 'active-mac-address' in row:
+                mac = row['active-mac-address'].lower()
+                ip = row['active-address']
+                hostname = row.get('host-name','')
+                try:
+                    vendor = MacLookup().lookup(mac)
+                except:
+                    vendor = "Prefix is not registered"
 
-            mikrotik_scan = {
-                "mac": mac,
-                "ip": ip,
-                "hostname": hostname,
-                "vendor": vendor
-            }
+                mikrotik_scan = {
+                    "mac": mac,
+                    "ip": ip,
+                    "hostname": hostname,
+                    "vendor": vendor
+                }
 
-            mikrotik_network.append(mikrotik_scan)
+                mikrotik_network.append(mikrotik_scan)
+    except Exception as e:
+        print('        Could not connect to Mikrotik Router')
+        print_log(f"{e}")
 
     return mikrotik_network
 
@@ -705,6 +719,7 @@ def read_unifi_clients():
 
     except Exception as e:
         print('        Could not connect to UniFi Controller')
+        print_log(f"{e}")
 
     return unifi_network
 
@@ -748,7 +763,8 @@ def read_openwrt_clients():
             openwrt_network.append(device_data)
 
     except Exception as e:
-        print(f'        Could not connect to OpenWRT: {e}')
+        print('        Could not connect to OpenWRT')
+        print_log(f"{e}")
 
     return openwrt_network
 
@@ -802,7 +818,8 @@ def read_asuswrt_clients():
             asuswrt_network.append(device_data)
 
     except Exception as e:
-        print(f"        ...Skipped. Could not connect to Asus Router")
+        print(f"        Could not connect to Asus Router")
+        print_log(f"{e}")
 
     return asuswrt_network
 
@@ -844,6 +861,7 @@ async def collect_asuswrt_data(AsusRouter,AsusData):
         
         except Exception as e:
             print(f"        Connection error occurred: {e}")
+            print_log(f"{e}")
 
         await router.async_disconnect()
         # print("\nVerbindung sauber getrennt.")
