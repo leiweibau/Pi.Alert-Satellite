@@ -1111,6 +1111,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'satellite_ip': local_ip,
         'satellite_mac': local_mac,
         'satellite_id': SATELLITE_TOKEN,
+        'satellite_proxymode': PROXY_MODE,
+        'satellite_url': SATELLITE_MASTER_URL,
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
         'cpu_name': cpu_brand,
