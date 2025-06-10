@@ -668,6 +668,7 @@ def read_mikrotik_leases():
                 mikrotik_network.append(mikrotik_scan)
     except Exception as e:
         print('        Could not connect to Mikrotik Router')
+        print(f"        ...Skipped")
         print_log(f"{e}")
 
     return mikrotik_network
@@ -722,6 +723,7 @@ def read_unifi_clients():
 
     except Exception as e:
         print('        Could not connect to UniFi Controller')
+        print(f"        ...Skipped")
         print_log(f"{e}")
 
     return unifi_network
@@ -767,6 +769,7 @@ def read_openwrt_clients():
 
     except Exception as e:
         print('        Could not connect to OpenWRT')
+        print(f"        ...Skipped")
         print_log(f"{e}")
 
     return openwrt_network
@@ -822,6 +825,7 @@ def read_asuswrt_clients():
 
     except Exception as e:
         print(f"        Could not connect to Asus Router")
+        print(f"        ...Skipped")
         print_log(f"{e}")
 
     return asuswrt_network
@@ -1160,6 +1164,9 @@ def encrypt_submit_scandata(json_data):
         proc.stdin.write(enc_json_data)
 
     if DEBUG_OUTPUT:
+        print("------------------------------------------------------------------------")
+        print("                        Create Debug Output")
+        print("------------------------------------------------------------------------")
         with open(SATELLITE_BACK_PATH + '/output.json', 'w') as outfile:
             json.dump(json_data, outfile, indent=4)
 
