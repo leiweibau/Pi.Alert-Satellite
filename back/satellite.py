@@ -24,7 +24,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pathlib import Path
 from datetime import datetime
-import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal
+import sys, subprocess, os, re, datetime, socket, io, requests, time, pwd, glob, ipaddress, ssl, json, cpuinfo, platform, smtplib, psutil, tzlocal, asyncio, aiohttp
 
 #===============================================================================
 # CONFIG CONSTANTS
@@ -39,6 +39,9 @@ STATUS_FILE_REPORTED = SATELLITE_BACK_PATH + "/.reported"
 PIHOLE6_SES_VALID = ""
 PIHOLE6_SES_SID = ""
 PIHOLE6_SES_CSRF = ""
+
+# Only for debugging. Unencrypted scan results will be stored on the satellite
+DEBUG_JSON_OUTPUT = False
 
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
@@ -243,9 +246,12 @@ def scan_network():
     # OpenWRT
     print_log ('OpenWRT copy starts...')
     openwrt_network = read_openwrt_clients()
+    # AsusWRT
+    print_log ('AsusWRT copy starts...')
+    asuswrt_network = read_asuswrt_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, pihole_network, pihole_dhcp)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -295,9 +301,11 @@ def pihole_six_api_auth():
         return
     except requests.exceptions.ConnectionError as e:
         print(f"        Connection error occurred")
+        print_log (f"{e}")
         return
     except Exception as e:
         print(f"        An unexpected error occurred")
+        print_log (f"{e}")
         return
 
     response_json = response.json()
@@ -315,6 +323,7 @@ def pihole_six_api_auth():
             return
     except KeyError as e:
         print(f"        Invalid response. Check Pi-hole URL")
+        print_log(f"{e}")
         return
 
 #-------------------------------------------------------------------------------
@@ -338,9 +347,11 @@ def pihole_six_api_deauth():
         return
     except requests.exceptions.ConnectionError as e:
         print(f"        Connection error occurred")
+        print_log(f"{e}")
         return
     except Exception as e:
         print(f"        An unexpected error occurred")
+        print_log(f"{e}")
         return
 
     #print("        Pi-hole Logout")
@@ -455,7 +466,7 @@ def read_DHCP_leases_six():
             }
             pihole_dhcp.append(pihole_scan)
 
-
+        # DEBUG
         # pihole_scan = {
         #     "expires": 234442221,
         #     "mac": 'ww:ww:rr:11:11:22',
@@ -587,27 +598,32 @@ def read_fritzbox_active_hosts():
         print('        Missing python package')
         return fritzbox_network
 
-    # copy Fritzbox Network list
-    fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
-    hosts = fh.get_hosts_info()
-    for index, host in enumerate(hosts, start=1):
-        if host['status'] :
-            # status = 'active' if host['status'] else  '-'
-            ip = host['ip'] if host['ip'] else 'no IP'
-            mac = host['mac'].lower() if host['mac'] else '-'
-            hostname = host['name']
-            try:
-                vendor = MacLookup().lookup(host['mac'])
-            except:
-                vendor = "Prefix is not registered"
+    try:
+        # copy Fritzbox Network list
+        fh = FritzHosts(address=FRITZBOX_IP, user=FRITZBOX_USER, password=FRITZBOX_PASS)
+        hosts = fh.get_hosts_info()
+        for index, host in enumerate(hosts, start=1):
+            if host['status'] :
+                # status = 'active' if host['status'] else  '-'
+                ip = host['ip'] if host['ip'] else 'no IP'
+                mac = host['mac'].lower() if host['mac'] else '-'
+                hostname = host['name']
+                try:
+                    vendor = MacLookup().lookup(host['mac'])
+                except:
+                    vendor = "Prefix is not registered"
 
-            fritzbox_scan = {
-                "mac": mac,
-                "ip": ip,
-                "hostname": hostname,
-                "vendor": vendor
-            }
-            fritzbox_network.append(fritzbox_scan)
+                fritzbox_scan = {
+                    "mac": mac,
+                    "ip": ip,
+                    "hostname": hostname,
+                    "vendor": vendor
+                }
+                fritzbox_network.append(fritzbox_scan)
+    except Exception as e:
+        print('        Could not connect to Fritzbox')
+        print_log(f"{e}")
+
     return fritzbox_network
 
 #-------------------------------------------------------------------------------
@@ -626,29 +642,34 @@ def read_mikrotik_leases():
         print('        Missing python package')
         return mikrotik_network
 
-    data = []
-    conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
-    api = conn.get_api()
-    ret = api.get_resource('/ip/dhcp-server/lease').get()
-    conn.disconnect()
-    for row in ret:
-        if 'active-mac-address' in row:
-            mac = row['active-mac-address'].lower()
-            ip = row['active-address']
-            hostname = row.get('host-name','')
-            try:
-                vendor = MacLookup().lookup(mac)
-            except:
-                vendor = "Prefix is not registered"
+    try:
+        data = []
+        conn = routeros_api.RouterOsApiPool(MIKROTIK_IP, MIKROTIK_USER, MIKROTIK_PASS, plaintext_login=True)
+        api = conn.get_api()
+        ret = api.get_resource('/ip/dhcp-server/lease').get()
+        conn.disconnect()
+        for row in ret:
+            if 'active-mac-address' in row:
+                mac = row['active-mac-address'].lower()
+                ip = row['active-address']
+                hostname = row.get('host-name','')
+                try:
+                    vendor = MacLookup().lookup(mac)
+                except:
+                    vendor = "Prefix is not registered"
 
-            mikrotik_scan = {
-                "mac": mac,
-                "ip": ip,
-                "hostname": hostname,
-                "vendor": vendor
-            }
+                mikrotik_scan = {
+                    "mac": mac,
+                    "ip": ip,
+                    "hostname": hostname,
+                    "vendor": vendor
+                }
 
-            mikrotik_network.append(mikrotik_scan)
+                mikrotik_network.append(mikrotik_scan)
+    except Exception as e:
+        print('        Could not connect to Mikrotik Router')
+        print(f"        ...Skipped")
+        print_log(f"{e}")
 
     return mikrotik_network
 
@@ -702,6 +723,8 @@ def read_unifi_clients():
 
     except Exception as e:
         print('        Could not connect to UniFi Controller')
+        print(f"        ...Skipped")
+        print_log(f"{e}")
 
     return unifi_network
 
@@ -745,9 +768,110 @@ def read_openwrt_clients():
             openwrt_network.append(device_data)
 
     except Exception as e:
-        print(f'        Could not connect to OpenWRT: {e}')
+        print('        Could not connect to OpenWRT')
+        print(f"        ...Skipped")
+        print_log(f"{e}")
 
     return openwrt_network
+
+#-------------------------------------------------------------------------------
+def read_asuswrt_clients():
+
+    if not ASUSWRT_ACTIVE:
+        return
+
+    print('    AsusWRT Method...')
+
+    asuswrt_network = []
+
+    try:
+        from asusrouter import AsusRouter
+        from asusrouter.modules.data import AsusData
+    except:
+        print('        Missing python package')
+        return
+
+    try:
+        attempt = 0
+        max_attempts = 5
+
+        result = None
+        while not result and attempt < max_attempts:
+            result = asyncio.run(collect_asuswrt_data(AsusRouter, AsusData))
+            attempt += 1
+            if not result:
+                asyncio.run(asyncio.sleep(5))  # 5 sec delay
+
+        if not result:
+            print(f"        No results received after {max_attempts} attempts")
+
+
+        for client in result.values():
+            hostname = client["name"] or "(unknown)"
+            mac = client["mac"]
+            vendor = client["vendor"]
+            if vendor == "None" or vendor is None:
+                vendor = "(unknown)"
+            ip_method = client["ip_method"]
+
+            device_data = {
+                "mac": mac.lower(),
+                "hostname": hostname,
+                "ip": client["ip_address"],
+                "vendor": vendor,
+                "ip_method": ip_method
+            }
+            asuswrt_network.append(device_data)
+
+    except Exception as e:
+        print(f"        Could not connect to Asus Router")
+        print(f"        ...Skipped")
+        print_log(f"{e}")
+
+    return asuswrt_network
+
+#-------------------------------------------------------------------------------
+async def collect_asuswrt_data(AsusRouter,AsusData):
+    async with aiohttp.ClientSession() as session:
+        router = AsusRouter(
+            hostname=ASUSWRT_IP,
+            username=ASUSWRT_USER,
+            password=ASUSWRT_PASS,
+            use_ssl=ASUSWRT_SSL,
+            cache_time=2, 
+            session=session,
+        )
+
+        connected = await router.async_connect()
+        # print(f"Verbindung erfolgreich: {connected}")
+        if not connected:
+            return
+
+        try:
+            clients_data = await router.async_get_data(AsusData.CLIENTS)
+            
+            filtered_clients = {
+                mac: {
+                    'name': client.description.name,
+                    'ip_address': client.connection.ip_address,
+                    'mac': mac,
+                    'vendor': client.description.vendor,
+                    'ip_method': client.connection.ip_method.name
+                }
+                for mac, client in clients_data.items() if client.connection.online
+            }
+
+            if filtered_clients:
+                return filtered_clients
+            else:
+                return {}
+        
+        except Exception as e:
+            print(f"        Connection error occurred: {e}")
+            print_log(f"{e}")
+
+        await router.async_disconnect()
+        # print("\nVerbindung sauber getrennt.")
 
 #-------------------------------------------------------------------------------
 def resolve_device_name_netbios(pIP):
@@ -855,7 +979,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_pihole_network, p_pihole_dhcp):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp):
 
     all_devices = []
     # Internet Check
@@ -879,6 +1003,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     process_devices(p_unifi_network, 'UniFi', all_devices)
     # OpenWRT
     process_devices(p_openwrt_network, 'OpenWRT', all_devices)
+    # AsusWRT
+    process_devices(p_asuswrt_network, 'AsusWRT', all_devices)
     # Pihole Network
     process_devices(p_pihole_network, 'Pi-hole', all_devices)
     # Pihole Network
@@ -985,6 +1111,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'satellite_ip': local_ip,
         'satellite_mac': local_mac,
         'satellite_id': SATELLITE_TOKEN,
+        'satellite_proxymode': PROXY_MODE,
+        'satellite_url': SATELLITE_MASTER_URL,
         'scan_time': str(startTime),
         'uptime': formatted_uptime,
         'cpu_name': cpu_brand,
@@ -1005,6 +1133,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_mikrotik': MIKROTIK_ACTIVE,
         'scan_unifi': UNIFI_ACTIVE,
         'scan_openwrt': OPENWRT_ACTIVE,
+        'scan_asuswrt': ASUSWRT_ACTIVE,
         'scan_pihole_net': PIHOLE_ACTIVE,
         'scan_pihole_dhcp': PIHOLE_DHCP_ACTIVE
     }]
@@ -1036,9 +1165,12 @@ def encrypt_submit_scandata(json_data):
     with subprocess.Popen(openssl_command, stdin=subprocess.PIPE) as proc:
         proc.stdin.write(enc_json_data)
 
-    # DEBUG
-    # with open('output.json', 'w') as outfile:
-    #     json.dump(json_data, outfile, indent=4)
+    if DEBUG_JSON_OUTPUT:
+        print("------------------------------------------------------------------------")
+        print("                        Create Debug Output")
+        print("------------------------------------------------------------------------")
+        with open(SATELLITE_BACK_PATH + '/output.json', 'w') as outfile:
+            json.dump(json_data, outfile, indent=4)
 
     # Read the encrypted data from the file
     with open(SATELLITE_BACK_PATH + "/encrypted_scandata", "rb") as f:
