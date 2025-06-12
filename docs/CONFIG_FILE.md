@@ -69,6 +69,18 @@
 | OPENWRT_USER   | Username                                                                                                                                                                                          |
 | OPENWRT_PASS   | Password   
 
+
+#### AsusWRT Configuration
+
+| Option         | Description |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ASUSWRT_ACTIVE | If a Asus Router is used in the network, it can be used as a data source. This can be activated or deactivated at this point. |
+| ASUSWRT_IP     | IP address of the router.                                                                                                                                                                 |
+| ASUSWRT_USER   | Username                                                                                                                                                                                          |
+| ASUSWRT_PASS   | Password   |
+| ASUSWRT_SSL    | Whether SSL is used or not   |
+
+
 #### Pi-hole Configuration
 
 | Option                   | Description |

@@ -41,7 +41,7 @@ PIHOLE6_SES_SID = ""
 PIHOLE6_SES_CSRF = ""
 
 # Only for debugging. Unencrypted scan results will be stored on the satellite
-DEBUG_OUTPUT = False
+DEBUG_JSON_OUTPUT = False
 
 if (sys.version_info > (3,0)):
     exec(open(SATELLITE_PATH + "/config/version.conf").read())
@@ -1165,7 +1165,7 @@ def encrypt_submit_scandata(json_data):
     with subprocess.Popen(openssl_command, stdin=subprocess.PIPE) as proc:
         proc.stdin.write(enc_json_data)
 
-    if DEBUG_OUTPUT:
+    if DEBUG_JSON_OUTPUT:
         print("------------------------------------------------------------------------")
         print("                        Create Debug Output")
         print("------------------------------------------------------------------------")

@@ -12,6 +12,8 @@ Here you can see the basic structure of the unencrypted json, which is sent encr
             "satellite_ip": "<SATELLITE IP>",
             "satellite_mac": "<SATELLITE MAC>",
             "satellite_id": "<SATELLITE_TOKEN>",
+            "satellite_proxymode": "<PROXY_MODE>",
+            "satellite_url": "<SATELLITE_MASTER_URL>",
             "scan_time": "2024-07-16 15:28:00",
             "uptime": "0d 00h 17m ",
             "cpu_name": "Intel(R) Celeron(R) CPU  N2830  @ 2.16GHz",
