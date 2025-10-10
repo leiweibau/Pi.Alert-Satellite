@@ -15,13 +15,11 @@ The API is installed on a separate web server. The satellite now transmits the d
 
 ### Scan Methods
 
-  - **arp-scan**. The arp-scan system utility is used to search for devices on the network using arp frames.
-  - **Fritzbox**. If you use a Fritzbox (a router from the company "AVM"), it is possible to perform a query of the active hosts. This also includes hosts of the guest WLAN and Powerline devices from "AVM".
-  - **Mikrotik**. If you use Mikrotik Router as DHCP server, it is possible to read DHCP leases.
-  - **UniFi**. If you use UniFi controller, it is possible to read clients (Client Devices)
-  - **OpenWRT**. If you are using a router based on OpenWRT, you can import the active devices.
-  - **Pi-hole DNS**. If the Pi-hole v6 DNS server is active, Pi.Alert examines its activity looking for active devices using DNS that have not been detected by other methods.
-  - **Pi-hole DHCP**. If the Pi-hole v6 DHCP server is active, Pi.Alert examines the DHCP leases (addresses assigned) to find devices that were not discovered by the other methods.
+<ins>**arp-scan**</ins> (system utility to search for devices using arp frames), 
+<ins>**Pi-hole DNS**</ins> (v5 or v6), <ins>**Pi-hole DHCP**</ins>. (v5 or v6),
+<ins>**Fritzbox**</ins> (active Hosts), <ins>**Mikrotik**</ins> (DHCP leases), <ins>**UniFi**</ins> (Client Devices), <ins>**OpenWRT**</ins> (active hosts), 
+<ins>**AsusWRT**</ins> (active hosts)
+
 ### Installation
 <!--- --------------------------------------------------------------------- --->
 Initially designed to run on a Debian based Linux distribution. 
