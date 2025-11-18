@@ -249,9 +249,12 @@ def scan_network():
     # AsusWRT
     print_log ('AsusWRT copy starts...')
     asuswrt_network = read_asuswrt_clients()
+    # pfSense
+    print_log ('pfsense copy starts...')
+    pfsense_network = read_pfsense_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp)
+    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp, pfsense_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -259,11 +262,305 @@ def scan_network():
     return 0
 
 #-------------------------------------------------------------------------------
+def pfsense_connect(endpoint,topic):
+    global PFSENSE_PORT
+
+    try:
+        PFSENSE_PORT = int(PFSENSE_PORT)
+    except (TypeError, ValueError):
+        print(f"        ...{topic} Request canceled: Incorrect Port.")
+        return None
+
+    protocol = "https" if PFSENSE_SSL else "http"
+    port = str(PFSENSE_PORT)
+
+    url = f"{protocol}://{PFSENSE_IP}:{port}{endpoint}"
+    headers = {
+        "X-API-Key": PFSENSE_APIKEY,
+        "Accept": "application/json"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, verify=False, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"        ...❌ Error {response.status_code}: {response.text}")
+            return None
+
+    except requests.Timeout:
+        print(f"        ...{topic} Request canceled: Timeout reached.")
+        return None
+
+    except requests.RequestException as e:
+        print(f"        ...{topic} Skipped - Connection error")
+        return None
+
+#-------------------------------------------------------------------------------
+def read_pfsense_clients():
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    pfsense_dhcpleases = ""
+    pfsense_arptable = ""
+    pfsense_local_interfaces = ""
+    pfsense_processed = {}
+
+    if PFSENSE_ACTIVE:
+        # empty Table
+        print(f"    pfSense Method...")
+        endpoint = "/api/v2/status/dhcp_server/leases?limit=0&offset=0&sort_order=SORT_ASC&sort_flags=SORT_STRING"
+        result = pfsense_connect(endpoint,"DHCP")
+        print_log(result)
+        if result:
+            pfsense_dhcpleases = json.dumps(result, indent=4)
+
+        endpoint = "/api/v2/diagnostics/arp_table?limit=0&offset=0"
+        result = pfsense_connect(endpoint,"ARP")
+        print_log(result)
+        if result:
+            pfsense_arptable = json.dumps(result, indent=4)
+
+        endpoint = "/api/v2/interface/available_interfaces"
+        result = pfsense_connect(endpoint,"Interfaces")
+        print_log(result)
+        if result:
+            pfsense_local_interfaces = json.dumps(result, indent=4)
+
+        pfsense_processed = pfsense_save_dhcp_data(pfsense_dhcpleases)
+        pfsense_processed = pfsense_save_arp_data(pfsense_arptable, pfsense_local_interfaces, pfsense_processed)
+        pfsense_processed = pfsense_mark_local_interfaces(pfsense_local_interfaces, pfsense_processed)
+
+    return pfsense_processed
+
+#-------------------------------------------------------------------------------
+def pfsense_mark_local_interfaces(interfaces, p_pfsense_processed):
+
+    if isinstance(interfaces, str):
+        try:
+            interfaces = json.loads(interfaces)
+        except json.JSONDecodeError:
+            print_log("        ...❌ Error: invalid JSON-format (interfaces)")
+            return [], []
+
+    local_interfaces = []
+    if not interfaces or "data" not in interfaces:
+        print_log("⚠️ no local interfaces were found")
+        return local_interfaces
+
+    for entry in interfaces["data"]:
+        mac = (entry.get("mac") or "").strip().lower()
+        in_use_by = (entry.get("in_use_by") or "").strip()
+
+        if not mac:
+            continue
+
+        local_interfaces.append({
+            "MAC": mac,
+            "in_use_by": in_use_by
+        })
+
+    for entry in local_interfaces:
+        mac = entry["MAC"]
+        in_use_by = entry["in_use_by"]
+        new_name = f"pfSense {in_use_by}"
+
+        # Datensatz nur ändern, wenn vorhanden
+        if mac in p_pfsense_processed:
+
+            present_mac = p_pfsense_processed[mac]
+
+            # entspricht: WHERE PF_Name = '(unknown)'
+            if present_mac.get("Name") == "(unknown)":
+                present_mac["Name"] = new_name
+
+    print_log(local_interfaces)
+    return p_pfsense_processed
+
+#-------------------------------------------------------------------------------
+def pfsense_save_dhcp_data(pfsense_dhcpleases):
+
+    if isinstance(pfsense_dhcpleases, str):
+        try:
+            pfsense_dhcpleases = json.loads(pfsense_dhcpleases)
+        except json.JSONDecodeError:
+            print_log("        ...❌ Error: invalid JSON-format (pfsense_dhcpleases)")
+            return [], []
+
+    pfsense_network_dhcp = []
+
+    # Check if "data" exists
+    if not pfsense_dhcpleases or "data" not in pfsense_dhcpleases:
+        print_log("⚠️ no DHCP-Leases were found")
+        return pfsense_network_dhcp
+
+    for entry in pfsense_dhcpleases["data"]:
+        mac = entry.get("mac", "").strip().lower()
+        ip = entry.get("ip", "").strip()
+        hostname = entry.get("hostname") or "(unknown)"
+        ends_str = entry.get("ends")
+
+        # convert "ends" in UNIX-Timestamp
+        try:
+            ends_ts = int(datetime.datetime.strptime(ends_str, "%Y/%m/%d %H:%M:%S").timestamp())
+        except (ValueError, TypeError):
+            ends_ts = 0
+
+        pf_connected = False
+        # Only active hosts for current scan
+        if entry.get("online_status") == "active/online":
+            pf_connected = True
+
+        # All hosts für dhcp list
+        pfsense_network_dhcp.append({
+            "MAC": mac,
+            "IP": ip,
+            "Name": hostname,
+            "Vendor": "",
+            "Method": "pfSense",
+            "Interface": "",
+            "Custom_a": "",
+            "Custom_b": "",
+            "Connected": pf_connected,
+            "Datetime": ends_ts
+        })
+
+        dict_pfsense_processed = {
+            item["MAC"].lower(): item
+            for item in pfsense_network_dhcp
+            if item.get("MAC")
+        }
+
+    print_log(pfsense_network_dhcp)
+    return dict_pfsense_processed
+
+#-------------------------------------------------------------------------------
+def pfsense_save_arp_data(pfsense_arptable, interfaces, p_pfsense_processed):
+
+    if isinstance(pfsense_arptable, str):
+        try:
+            pfsense_arptable = json.loads(pfsense_arptable)
+        except json.JSONDecodeError:
+            print_log("        ...❌ Error: invalid JSON-format (pfsense_arptable)")
+            return [], []
+
+    if isinstance(interfaces, str):
+        try:
+            interfaces = json.loads(interfaces)
+        except json.JSONDecodeError:
+            print_log("        ...❌ Error: invalid JSON-format (interfaces)")
+            return [], []
+
+    pfsense_arp_list = []
+    # Check if "data" exists
+    if not pfsense_arptable or "data" not in pfsense_arptable:
+        print_log("⚠️ no valid ARP-data found.")
+        return pfsense_arp_list
+
+    local_interfaces = []
+    if not interfaces or "data" not in interfaces:
+        return local_interfaces
+
+    for entry in interfaces["data"]:
+        mac = (entry.get("mac") or "").strip().lower()
+        in_use_by = (entry.get("in_use_by") or "").strip()
+
+        if not mac:
+            continue
+
+        local_interfaces.append({
+            "MAC": mac
+        })
+
+    for entry in pfsense_arptable["data"]:
+        mac = entry.get("mac_address", "").strip().lower()
+        ip = entry.get("ip_address", "").strip()
+        hostname = entry.get("hostname", "").strip()
+        dnsresolve = entry.get("dnsresolve", "").strip()
+        interface = entry.get("interface", "").strip()
+        arpexpires = entry.get("expires", "").strip()
+
+        if interface.lower() in (i.lower() for i in PFSENSE_EXCLUDE_INT) and all(mac != entry["MAC"] for entry in local_interfaces):
+            continue
+
+        # Get Arp exp. seconds
+        match = re.search(r"Expires\s+in\s+(\d+)\s+seconds", arpexpires, flags=re.I)
+
+        if match:
+            seconds = match.group(1)
+        else:
+            seconds = ""
+
+        # set Connected-Status
+        if arpexpires.lower() == "permanent" or (seconds != "" and int(seconds) > 0):
+            connected = True
+        else:
+            connected = False
+
+        # Hostname-Regeln
+        if hostname == "" or hostname == "?":
+            if dnsresolve != "" and dnsresolve != "?":
+                hostname = dnsresolve
+            else:
+                hostname = "(unknown)"
+
+        # All hosts für arp list
+        pfsense_arp_list.append({
+            "MAC": mac,
+            "IP": ip,
+            "Name": hostname,
+            "Vendor": "",
+            "Method": "pfSense",
+            "Interface": interface,
+            "Custom_a": seconds,
+            "Custom_b": "",
+            "Connected": connected,
+            "Datetime": ""
+        })
+
+    for entry in pfsense_arp_list:
+        mac = entry["MAC"].lower()  # wie COLLATE NOCASE bei SQLite
+
+        if mac in p_pfsense_processed:
+            # Record existiert → selective update
+            present_mac = p_pfsense_processed[mac]
+
+            # Interface aktualisieren (nur wenn DB leer und ARP-Entry vorhanden)
+            if (not present_mac["Interface"] or present_mac["Interface"].strip() == "") \
+                    and entry["Interface"]:
+                present_mac["Interface"] = entry["Interface"]
+
+            # Name aktualisieren
+            if (not present_mac["Name"] or present_mac["Name"].strip() == "") \
+                    and entry["Name"]:
+                present_mac["Name"] = entry["Name"]
+
+            # Connected aktualisieren
+            if (not present_mac["Connected"]) and entry["Connected"]:
+                present_mac["Connected"] = 1
+
+        else:
+            # Record existiert nicht → wie INSERT
+            p_pfsense_processed[mac] = {
+                "MAC": entry["MAC"],
+                "IP": entry["IP"],
+                "Name": entry["Name"],
+                "Vendor": entry["Vendor"],
+                "Method": entry["Method"],
+                "Interface": entry["Interface"],
+                "Custom_a": entry["Custom_a"],
+                "Custom_b": entry["Custom_b"],
+                "Connected": entry["Connected"],
+                "Datetime": entry["Datetime"]
+            }
+
+    print_log(pfsense_arp_list)
+    return p_pfsense_processed
+
+#-------------------------------------------------------------------------------
 def copy_pihole_network():
     # check if Pi-hole is active
     if not PIHOLE_ACTIVE :
         return
-
 
     print('    Pi-hole Method...')
     pihole_six_api_auth()
@@ -353,8 +650,6 @@ def pihole_six_api_deauth():
         print(f"        An unexpected error occurred")
         print_log(f"{e}")
         return
-
-    #print("        Pi-hole Logout")
 
 #-------------------------------------------------------------------------------
 def copy_pihole_network_six():
@@ -466,15 +761,6 @@ def read_DHCP_leases_six():
             }
             pihole_dhcp.append(pihole_scan)
 
-        # DEBUG
-        # pihole_scan = {
-        #     "expires": 234442221,
-        #     "mac": 'ww:ww:rr:11:11:22',
-        #     "ip": '22.55.33.11',
-        #     "hostname": 'DemoHost'
-        # }
-        # pihole_dhcp.append(pihole_scan)
-
         return pihole_dhcp
 
     else:
@@ -568,7 +854,6 @@ def execute_arpscan():
 def execute_arpscan_on_interface(SCAN_SUBNETS):
     # Prepare command arguments
     subnets = SCAN_SUBNETS.strip().split()
-    # Retry is 3 to avoid false offline devices
     arpscan_args = ['sudo', 'arp-scan', '--ignoredups', '--bandwidth=256k', '--retry=6'] + subnets
 
     # Execute command
@@ -589,7 +874,6 @@ def read_fritzbox_active_hosts():
         return
 
     print('    Fritzbox Method...')
-
     fritzbox_network = []
 
     try:
@@ -633,7 +917,6 @@ def read_mikrotik_leases():
         return
 
     print('    Mikrotik Method...')
-
     mikrotik_network = []
 
     try:
@@ -680,7 +963,6 @@ def read_unifi_clients():
         return
 
     print('    UniFi Method...')
-
     unifi_network = []
 
     try:
@@ -689,7 +971,6 @@ def read_unifi_clients():
         print('        Missing python package')
         return unifi_network
 
-    # Enable self signed SSL / no warnings
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     try:
@@ -735,7 +1016,6 @@ def read_openwrt_clients():
         return
 
     print('    OpenWRT Method...')
-
     openwrt_network = []
 
     try:
@@ -744,12 +1024,10 @@ def read_openwrt_clients():
         print('        Missing python package')
         return openwrt_network
 
-    # Enable self signed SSL / no warnings
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     try:
         escaped_password = repr(OPENWRT_PASS)[1:-1]
-
         router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), escaped_password)
         result = router.get_all_connected_devices(only_reachable=True)
 
@@ -781,7 +1059,6 @@ def read_asuswrt_clients():
         return
 
     print('    AsusWRT Method...')
-
     asuswrt_network = []
 
     try:
@@ -804,7 +1081,6 @@ def read_asuswrt_clients():
 
         if not result:
             print(f"        No results received after {max_attempts} attempts")
-
 
         for client in result.values():
             hostname = client["name"] or "(unknown)"
@@ -843,13 +1119,12 @@ async def collect_asuswrt_data(AsusRouter,AsusData):
         )
 
         connected = await router.async_connect()
-        # print(f"Verbindung erfolgreich: {connected}")
+
         if not connected:
             return
 
         try:
             clients_data = await router.async_get_data(AsusData.CLIENTS)
-            
             filtered_clients = {
                 mac: {
                     'name': client.description.name,
@@ -871,7 +1146,6 @@ async def collect_asuswrt_data(AsusRouter,AsusData):
             print_log(f"{e}")
 
         await router.async_disconnect()
-        # print("\nVerbindung sauber getrennt.")
 
 #-------------------------------------------------------------------------------
 def resolve_device_name_netbios(pIP):
@@ -887,7 +1161,7 @@ def resolve_device_name_netbios(pIP):
         else:
             newName = ""
         return newName
-    # Error handling
+
     except subprocess.TimeoutExpired:
         newName = ""
         return newName
@@ -903,7 +1177,7 @@ def resolve_device_name_avahi(pIP):
         else:
             newName = ""
         return newName.strip()
-    # Error handling
+
     except subprocess.TimeoutExpired:
         newName = ""
         return newName
@@ -925,7 +1199,7 @@ def resolve_device_name_dig(pIP):
         if ";; communications error to" in newName:
             newName = ""
         return newName.strip()
-    # Error handling
+
     except subprocess.TimeoutExpired:
         newName = ""
         return newName
@@ -979,7 +1253,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp, p_pfsense_network):
 
     all_devices = []
     # Internet Check
@@ -994,7 +1268,6 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
-
     # Fritz!Box
     process_devices(p_fritzbox_network, 'Fritzbox', all_devices)
     # Mikrotik
@@ -1021,7 +1294,18 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_SatelliteID': SATELLITE_TOKEN
                 }
                 all_devices.append(device_data)
-
+    # pfSense
+    if p_pfsense_network:
+        for mac, device in p_pfsense_network.items():
+            if device.get("Connected") and len(mac) > 12:
+                all_devices.append({
+                    'cur_MAC': device.get('MAC', mac),
+                    'cur_IP': device.get('IP', ''),
+                    'cur_hostname': device.get('Name', '(unknown)'),
+                    'cur_Vendor': "",
+                    'cur_ScanMethod': 'pfSense',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                })
     # Arpscan
     if bool(p_arpscan_devices):
         for device in p_arpscan_devices:
@@ -1348,7 +1632,6 @@ def send_email(pText, pHTML, logs):
     finally:
         smtp_connection.quit()
         print(f"    Message sent")
-
 
 #-------------------------------------------------------------------------------
 def SafeParseGlobalBool(boolVariable):
