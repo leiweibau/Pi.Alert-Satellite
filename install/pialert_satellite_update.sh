@@ -179,6 +179,21 @@ ASUSWRT_SSL               = False
 EOF
 fi
 
+# 2025-11-18
+if ! grep -Fq "# pfsense Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# pfsense Configuration
+# ----------------------
+PFSENSE_ACTIVE            = False
+PFSENSE_IP                = '192.168.1.1'
+PFSENSE_PORT              = 80
+PFSENSE_APIKEY            = ''
+PFSENSE_SSL               = False
+PFSENSE_EXCLUDE_INT       = ['WAN']
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------
