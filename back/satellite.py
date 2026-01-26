@@ -74,7 +74,7 @@ def main():
 
     # Check parameters
     if len(sys.argv) != 2 :
-        print('usage satelite scan | internet_IP | update_vendors | email_test' )
+        print('usage satelite scan | update_vendors | email_test' )
         return
     cycle = str(sys.argv[1])
 
@@ -88,11 +88,11 @@ def main():
     elif cycle == 'email_test':
         res = mail_notification('Test')
     else:
-        print('usage satelite scan | internet_IP | update_vendors | email_test' )
+        print('usage satelite scan | update_vendors | email_test' )
         return
 
     # Remove scan status file created in scan_network()
-    if cycle not in ['internet_IP' 'update_vendors', 'update_vendors_silent'] and os.path.exists(STATUS_FILE_SCAN):
+    if cycle not in ['update_vendors', 'update_vendors_silent'] and os.path.exists(STATUS_FILE_SCAN):
         os.remove(STATUS_FILE_SCAN)
 
     # Final menssage
@@ -222,7 +222,12 @@ def scan_network():
     print('Scan Devices')
     print('    Timestamp:', startTime )
     print('\nCheck Internet Connectivity...')
-    internet_detection = check_internet_IP()
+    if INTERNET_DETECTION==True:
+        wanip_detection = check_internet_IP()
+    else:
+        wanip_detection = []
+        print('    Skipped...\n')
+    # internet_detection = check_internet_IP()
     # arp-scan command
     print('\nScanning...')
     # arp-scan
@@ -254,7 +259,7 @@ def scan_network():
     pfsense_network = read_pfsense_clients()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (internet_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp, pfsense_network)
+    jsondata = save_scanned_devices (wanip_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp, pfsense_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
