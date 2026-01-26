@@ -57,9 +57,9 @@ configure_user() {
 # ------------------------------------------------------------------------------
 create_backup() {
   # Previous backups are deleted to preserve storage 
-  print_msg "- Deleting previous Pi.Alert backups..."
+  print_msg "- Deleting previous Pi.Alert-Satellite backups..."
   rm -f "$INSTALL_DIR/"satellite_update_backup_*.tar
-  print_msg "- Creating new Pi.Alert backup..."
+  print_msg "- Creating new Pi.Alert-Satellite backup..."
   cd "$INSTALL_DIR"
   tar cvf "$INSTALL_DIR"/satellite_update_backup_`date +"%Y-%m-%d_%H-%M"`.tar pialert_satellite --checkpoint=100 --checkpoint-action="ttyout=."     2>&1 >> "$LOG"
 }
@@ -219,15 +219,15 @@ check_pialert_home() {
 check_and_install_package() {
   package_name="$1"
   if pip3 show "$package_name" > /dev/null 2>&1; then
-    print_msg "- $package_name is already installed"
+    print_msg "  - $package_name is already installed"
   else
-    print_msg "- Installing $package_name..."
-    if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
-      pip3 -q install "$package_name" --break-system-packages --no-warn-script-location       2>&1 >> "$LOG"
+    print_msg "  - Installing $package_name..."
+    if [ -e "$(find /usr/lib -path '*/python3.*/EXTERNALLY-MANAGED' -print -quit)" ]; then
+      pip3 -q install "$package_name" --break-system-packages --no-warn-script-location         2>&1 >> "$LOG"
     else
-      pip3 -q install "$package_name" --no-warn-script-location                               2>&1 >> "$LOG"
+      pip3 -q install "$package_name" --no-warn-script-location                                 2>&1 >> "$LOG"
     fi
-    print_msg "- $package_name is now installed"
+    print_msg "    - $package_name is now installed"
   fi
 }
 check_python_version() {
@@ -240,16 +240,25 @@ check_python_version() {
     check_and_install_package "fritzconnection"
     check_and_install_package "routeros_api"
     check_and_install_package "pyunifi"
-    check_and_install_package "openwrt_luci_rpc"
+    check_and_install_package "openwrt-luci-rpc"
     check_and_install_package "asusrouter"
 
-    print_msg "- Update 'requests' package to 2.31.0"
-    if [ -f /usr/lib/python3.*/EXTERNALLY-MANAGED ]; then
-      pip3 -q install "requests>=2.31.0" --break-system-packages --no-warn-script-location       2>&1 >> "$LOG"
-    else
-      pip3 -q install "requests>=2.31.0" --no-warn-script-location                               2>&1 >> "$LOG"
+    REQUIRED_VERSION="2.31.0"
+    INSTALLED_VERSION=$(pip3 show requests 2>/dev/null | awk '/^Version:/ {print $2}')
+
+    version_lt () {
+      [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" != "$2" ]
+    }
+
+    if [ -z "$INSTALLED_VERSION" ] || version_lt "$INSTALLED_VERSION" "$REQUIRED_VERSION"; then
+      print_msg "  - Updating requests (installed: ${INSTALLED_VERSION:-none})"
+      if [ -e "$(find /usr/lib -path '*/python3.*/EXTERNALLY-MANAGED' -print -quit)" ]; then
+        pip3 -q install "requests>=${REQUIRED_VERSION}" --break-system-packages --no-warn-script-location   2>&1 >> "$LOG"
+      else
+        pip3 -q install "requests>=${REQUIRED_VERSION}" --no-warn-script-location                           2>&1 >> "$LOG"
+      fi
     fi
-    
+
   else
     print_msg "Python 3 NOT installed"
     process_error "Python 3 is required for this application"
