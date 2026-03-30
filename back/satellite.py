@@ -257,9 +257,15 @@ def scan_network():
     # pfSense
     print_log ('pfsense copy starts...')
     pfsense_network = read_pfsense_clients()
+    # OPNsense
+    print_log ('opnsense copy starts...')
+    opnsense_network = read_opnsense_clients()
+    # AdGuard
+    print_log ('adguard copy starts...')
+    adguard_network = read_adguard_data()
     print('\nProcessing scan results...')
     print('    Create json of scanned devices')
-    jsondata = save_scanned_devices (wanip_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp, pfsense_network)
+    jsondata = save_scanned_devices (wanip_detection, arpscan_devices, fritzbox_network, mikrotik_network, unifi_network, openwrt_network, asuswrt_network, pihole_network, pihole_dhcp, pfsense_network, opnsense_network, adguard_network)
     print('    Encrypt data and transmit to Master or Proxy')
     encrypt_submit_scandata(jsondata)
     mail_notification("scan")
@@ -560,6 +566,666 @@ def pfsense_save_arp_data(pfsense_arptable, interfaces, p_pfsense_processed):
 
     print_log(pfsense_arp_list)
     return p_pfsense_processed
+
+#-------------------------------------------------------------------------------
+def opnsense_connect(endpoint, topic):
+    global OPNSENSE_PORT
+
+    try:
+        OPNSENSE_PORT = int(OPNSENSE_PORT)
+    except (TypeError, ValueError):
+        print(f"        ...{topic} Request canceled: Incorrect Port.")
+        return None
+
+    protocol = "https" if OPNSENSE_SSL else "http"
+    port = str(OPNSENSE_PORT)
+    url = f"{protocol}://{OPNSENSE_IP}:{port}{endpoint}"
+    headers = {
+        "Accept": "application/json"
+    }
+
+    try:
+        response = requests.get(
+            url,
+            headers=headers,
+            auth=(OPNSENSE_APIKEY, OPNSENSE_APISECRET),
+            verify=False,
+            timeout=10
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"        ...Error {response.status_code}: {response.text}")
+            return None
+
+    except requests.Timeout:
+        print(f"        ...{topic} Request canceled: Timeout reached.")
+        return None
+
+    except requests.RequestException:
+        print(f"        ...{topic} Skipped - Connection error")
+        return None
+
+#-------------------------------------------------------------------------------
+def read_opnsense_clients():
+
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    opnsense_dhcpleases = ""
+    opnsense_arptable = ""
+    opnsense_interfaces = ""
+    opnsense_interface_names = ""
+    opnsense_processed = {}
+
+    if OPNSENSE_ACTIVE:
+        print("    OPNsense Method...")
+        result = opnsense_fetch_dhcp_leases()
+        print_log(result)
+        if result:
+            opnsense_dhcpleases = json.dumps(result, indent=4)
+
+        endpoint = "/api/diagnostics/interface/search_arp"
+        result = opnsense_connect(endpoint, "ARP")
+        print_log(result)
+        if result:
+            opnsense_arptable = json.dumps(result, indent=4)
+
+        endpoint = "/api/diagnostics/interface/get_interface_config"
+        result = opnsense_connect(endpoint, "Interfaces")
+        print_log(result)
+        if result:
+            opnsense_interfaces = json.dumps(result, indent=4)
+
+        endpoint = "/api/diagnostics/interface/get_interface_names"
+        result = opnsense_connect(endpoint, "Interface Names")
+        print_log(result)
+        if result:
+            opnsense_interface_names = json.dumps(result, indent=4)
+
+        opnsense_processed = opnsense_save_dhcp_data(opnsense_dhcpleases)
+        opnsense_processed = opnsense_save_arp_data(opnsense_arptable, opnsense_interfaces, opnsense_interface_names, opnsense_processed)
+        opnsense_processed = opnsense_mark_local_interfaces(opnsense_interfaces, opnsense_interface_names, opnsense_processed)
+
+    return opnsense_processed
+
+#-------------------------------------------------------------------------------
+def opnsense_fetch_dhcp_leases():
+    dhcp_endpoints = [
+        ("/api/dhcpv4/leases/search_lease?inactive=1", "DHCP"),
+        ("/api/dnsmasq/leases/search", "Dnsmasq DHCP"),
+        ("/api/kea/leases4/search", "Kea DHCP")
+    ]
+
+    first_response = None
+
+    for endpoint, topic in dhcp_endpoints:
+        result = opnsense_connect(endpoint, topic)
+
+        if first_response is None and result is not None:
+            first_response = result
+
+        if opnsense_get_rows(result):
+            print_log(f"        ...OPNsense DHCP backend selected: {topic}")
+            return result
+
+    return first_response
+
+#-------------------------------------------------------------------------------
+def opnsense_get_rows(payload):
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            return []
+
+    if isinstance(payload, dict):
+        if "rows" in payload and isinstance(payload["rows"], list):
+            return payload["rows"]
+        if "data" in payload and isinstance(payload["data"], list):
+            return payload["data"]
+
+    if isinstance(payload, list):
+        return payload
+
+    return []
+
+#-------------------------------------------------------------------------------
+def opnsense_get_interface_map(interface_names):
+    if isinstance(interface_names, str):
+        try:
+            interface_names = json.loads(interface_names)
+        except json.JSONDecodeError:
+            return {}
+
+    if isinstance(interface_names, dict):
+        return interface_names
+
+    return {}
+
+#-------------------------------------------------------------------------------
+def opnsense_mark_local_interfaces(interfaces, interface_names, p_opnsense_processed):
+
+    if isinstance(interfaces, str):
+        try:
+            interfaces = json.loads(interfaces)
+        except json.JSONDecodeError:
+            print_log("        ...Error: invalid JSON-format (interfaces)")
+            return p_opnsense_processed
+
+    interface_map = opnsense_get_interface_map(interface_names)
+    if not isinstance(interfaces, dict):
+        print_log("        ...Info: no local interfaces were found")
+        return p_opnsense_processed
+
+    local_interfaces = []
+
+    for if_name, if_data in interfaces.items():
+        if not isinstance(if_data, dict):
+            continue
+
+        mac = (
+            if_data.get("mac")
+            or if_data.get("macaddr")
+            or if_data.get("ether")
+            or ""
+        ).strip().lower()
+
+        if not mac:
+            continue
+
+        local_interfaces.append({
+            "MAC": mac,
+            "Description": interface_map.get(if_name, if_name.upper())
+        })
+
+    for entry in local_interfaces:
+        mac = entry["MAC"]
+        if mac in p_opnsense_processed and p_opnsense_processed[mac].get("Name") == "(unknown)":
+            p_opnsense_processed[mac]["Name"] = f"OPNsense {entry['Description']}"
+
+    print_log(local_interfaces)
+    return p_opnsense_processed
+
+#-------------------------------------------------------------------------------
+def opnsense_save_dhcp_data(opnsense_dhcpleases):
+
+    if isinstance(opnsense_dhcpleases, str):
+        try:
+            opnsense_dhcpleases = json.loads(opnsense_dhcpleases)
+        except json.JSONDecodeError:
+            print_log("        ...Error: invalid JSON-format (opnsense_dhcpleases)")
+            return {}
+
+    opnsense_network_dhcp = []
+    lease_rows = opnsense_get_rows(opnsense_dhcpleases)
+
+    if not lease_rows:
+        print_log("        ...Info: no DHCP-Leases were found")
+        return {}
+
+    for entry in lease_rows:
+        mac = (entry.get("mac") or entry.get("hwaddr") or "").strip().lower()
+        ip = (entry.get("address") or entry.get("ip") or "").strip()
+        hostname = (entry.get("hostname") or entry.get("host") or entry.get("name") or entry.get("descr") or "(unknown)").strip() or "(unknown)"
+        ends_str = entry.get("ends")
+        expire_value = entry.get("expire")
+        if_descr = entry.get("if_descr") or entry.get("if_name") or entry.get("if") or ""
+        vendor = entry.get("man") or entry.get("mac_info") or entry.get("manufacturer") or ""
+
+        if not mac or not ip:
+            continue
+
+        try:
+            ends_ts = int(datetime.datetime.strptime(ends_str, "%Y/%m/%d %H:%M:%S").timestamp())
+        except (ValueError, TypeError):
+            try:
+                ends_ts = int(ends_str)
+            except (ValueError, TypeError):
+                try:
+                    ends_ts = int(expire_value)
+                except (ValueError, TypeError):
+                    ends_ts = 0
+
+        status = str(entry.get("status") or "").lower()
+        state = str(entry.get("state") or "").lower()
+        active = entry.get("active")
+        expired = entry.get("expired")
+
+        if status != "":
+            opn_connected = status == "online"
+        elif active is not None:
+            opn_connected = bool(active)
+        elif expired is not None:
+            opn_connected = not bool(expired)
+        elif state != "":
+            opn_connected = state not in ["expired", "offline", "released", "free"]
+        else:
+            opn_connected = True
+
+        opnsense_network_dhcp.append({
+            "MAC": mac,
+            "IP": ip,
+            "Name": hostname,
+            "Vendor": vendor,
+            "Method": "OPNsense",
+            "Interface": if_descr,
+            "Custom_a": entry.get("type", ""),
+            "Custom_b": entry.get("state", ""),
+            "Connected": opn_connected,
+            "Datetime": ends_ts
+        })
+
+    dict_opnsense_processed = {
+        item["MAC"].lower(): item
+        for item in opnsense_network_dhcp
+        if item.get("MAC")
+    }
+
+    print_log(opnsense_network_dhcp)
+    return dict_opnsense_processed
+
+#-------------------------------------------------------------------------------
+def opnsense_save_arp_data(opnsense_arptable, interfaces, interface_names, p_opnsense_processed):
+
+    if isinstance(opnsense_arptable, str):
+        try:
+            opnsense_arptable = json.loads(opnsense_arptable)
+        except json.JSONDecodeError:
+            print_log("        ...Error: invalid JSON-format (opnsense_arptable)")
+            return p_opnsense_processed
+
+    if isinstance(interfaces, str):
+        try:
+            interfaces = json.loads(interfaces)
+        except json.JSONDecodeError:
+            print_log("        ...Error: invalid JSON-format (interfaces)")
+            return p_opnsense_processed
+
+    interface_map = opnsense_get_interface_map(interface_names)
+    arp_rows = opnsense_get_rows(opnsense_arptable)
+    opnsense_arp_list = []
+
+    if not arp_rows:
+        print_log("        ...Info: no valid ARP-data found.")
+        return p_opnsense_processed
+
+    local_interfaces = []
+    if isinstance(interfaces, dict):
+        for if_name, if_data in interfaces.items():
+            if not isinstance(if_data, dict):
+                continue
+
+            mac = (
+                if_data.get("mac")
+                or if_data.get("macaddr")
+                or if_data.get("ether")
+                or ""
+            ).strip().lower()
+
+            if mac:
+                local_interfaces.append({
+                    "MAC": mac,
+                    "Description": interface_map.get(if_name, if_name.upper())
+                })
+
+    for entry in arp_rows:
+        mac = (entry.get("mac") or entry.get("mac-address") or entry.get("mac_address") or "").strip().lower()
+        ip = (entry.get("ip") or entry.get("ip-address") or entry.get("ip_address") or "").strip()
+        hostname = (entry.get("hostname") or "").strip()
+        dnsresolve = (entry.get("dnsresolve") or "").strip()
+        interface = (entry.get("intf_description") or entry.get("interface") or entry.get("intf") or "").strip()
+        interface_raw = (entry.get("intf") or entry.get("interface") or "").strip()
+        manufacturer = (entry.get("manufacturer") or entry.get("vendor") or "").strip()
+        expires_raw = entry.get("expires")
+        permanent = bool(entry.get("permanent"))
+        expired = bool(entry.get("expired"))
+
+        if not mac or not ip:
+            continue
+
+        arpexpires = "" if expires_raw is None else str(expires_raw).strip()
+
+        if interface.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and all(mac != local_entry["MAC"] for local_entry in local_interfaces):
+            continue
+        if interface_raw.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and all(mac != local_entry["MAC"] for local_entry in local_interfaces):
+            continue
+
+        match = re.search(r"Expires\s+in\s+(\d+)\s+seconds", arpexpires, flags=re.I)
+        if match:
+            seconds = match.group(1)
+        elif arpexpires.isdigit():
+            seconds = arpexpires
+        else:
+            seconds = ""
+
+        if permanent or arpexpires.lower() == "permanent":
+            connected = True
+        elif expired:
+            connected = False
+        elif seconds != "":
+            connected = int(seconds) > 0
+        else:
+            connected = True
+
+        if hostname == "" or hostname == "?":
+            if dnsresolve != "" and dnsresolve != "?":
+                hostname = dnsresolve
+            else:
+                hostname = "(unknown)"
+
+        opnsense_arp_list.append({
+            "MAC": mac,
+            "IP": ip,
+            "Name": hostname,
+            "Vendor": manufacturer,
+            "Method": "OPNsense",
+            "Interface": interface or interface_raw,
+            "Custom_a": seconds,
+            "Custom_b": "",
+            "Connected": connected,
+            "Datetime": ""
+        })
+
+    arp_macs = {entry["MAC"] for entry in opnsense_arp_list}
+
+    for entry in opnsense_arp_list:
+        mac = entry["MAC"].lower()
+
+        if mac in p_opnsense_processed:
+            present_mac = p_opnsense_processed[mac]
+
+            if (not present_mac["Interface"] or present_mac["Interface"].strip() == "") and entry["Interface"]:
+                present_mac["Interface"] = entry["Interface"]
+
+            if (present_mac.get("Name") in ["", "(unknown)"]) and entry["Name"] and entry["Name"] != "(unknown)":
+                present_mac["Name"] = entry["Name"]
+
+            if entry["Vendor"] and not present_mac.get("Vendor"):
+                present_mac["Vendor"] = entry["Vendor"]
+
+            present_mac["Connected"] = entry["Connected"]
+
+        else:
+            p_opnsense_processed[mac] = {
+                "MAC": entry["MAC"],
+                "IP": entry["IP"],
+                "Name": entry["Name"],
+                "Vendor": entry["Vendor"],
+                "Method": entry["Method"],
+                "Interface": entry["Interface"],
+                "Custom_a": entry["Custom_a"],
+                "Custom_b": entry["Custom_b"],
+                "Connected": entry["Connected"],
+                "Datetime": entry["Datetime"]
+            }
+
+    if arp_macs:
+        for mac, device in p_opnsense_processed.items():
+            if mac not in arp_macs:
+                device["Connected"] = False
+
+    print_log(opnsense_arp_list)
+    return p_opnsense_processed
+
+#-------------------------------------------------------------------------------
+def adguard_try_login(protocol, host, port, headers, payload):
+    base_url = f"{protocol}://{host}:{port}"
+    login_url = f"{base_url}/control/login"
+
+    try:
+        response = requests.post(login_url, data=json.dumps(payload), headers=headers, timeout=5)
+        if response.status_code == 200:
+            return response.cookies, base_url
+    except requests.exceptions.RequestException:
+        pass
+
+    return None, None
+
+#-------------------------------------------------------------------------------
+def adguard_fetch_dns_queries(cookies, base_url, headers, limit=200):
+    url = f"{base_url}/control/querylog"
+    params = {
+        "limit": limit,
+        "response_status": "all",
+    }
+
+    try:
+        response = requests.get(url, params=params, cookies=cookies, headers=headers, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("data", [])
+    except Exception as error:
+        print_log(f"[!] Failed to fetch query log: {error}")
+        return []
+
+#-------------------------------------------------------------------------------
+def adguard_get_dhcp_leases(cookies, base_url, headers):
+    url = f"{base_url}/control/dhcp/status"
+
+    try:
+        response = requests.get(url, cookies=cookies, headers=headers, timeout=5)
+        response.raise_for_status()
+        all_leases = response.json()
+        return {
+            "leases": all_leases.get("leases", []),
+            "static_leases": all_leases.get("static_leases", []),
+        }
+    except Exception as error:
+        print_log(f"[!] Failed to fetch DHCP leases: {error}")
+        return {
+            "leases": [],
+            "static_leases": [],
+        }
+
+#-------------------------------------------------------------------------------
+def adguard_get_current_queries_per_client(cookies, base_url, headers, limit=200):
+    queries = adguard_fetch_dns_queries(cookies, base_url, headers, limit=limit)
+
+    if not queries:
+        return {}
+
+    latest_per_client = {}
+
+    for entry in queries:
+        client_info = entry.get("client_info", {})
+        client_ip = (entry.get("client") or "").strip()
+        if not adguard_is_valid_ipv4(client_ip):
+            continue
+
+        client_name = (client_info.get("name") or client_ip).strip() or client_ip
+        query_time_str = entry.get("time")
+
+        try:
+            query_time = datetime.datetime.fromisoformat(query_time_str.replace("Z", "+00:00")) if query_time_str else None
+        except Exception:
+            query_time = None
+
+        if client_ip not in latest_per_client:
+            latest_per_client[client_ip] = {
+                "time": query_time,
+                "client_ip": client_ip,
+                "client_name": client_name,
+            }
+            continue
+
+        current_time = latest_per_client[client_ip].get("time")
+        if current_time is None and query_time is not None:
+            latest_per_client[client_ip] = {
+                "time": query_time,
+                "client_ip": client_ip,
+                "client_name": client_name,
+            }
+        elif query_time is not None and current_time is not None and query_time > current_time:
+            latest_per_client[client_ip] = {
+                "time": query_time,
+                "client_ip": client_ip,
+                "client_name": client_name,
+            }
+
+    return latest_per_client
+
+#-------------------------------------------------------------------------------
+def adguard_get_first_value(item, keys, default=""):
+    for key in keys:
+        value = item.get(key)
+        if value is None:
+            continue
+
+        if isinstance(value, str):
+            value = value.strip()
+
+        if value != "":
+            return value
+
+    return default
+
+#-------------------------------------------------------------------------------
+def adguard_is_valid_ipv4(ip_value):
+    try:
+        ip = ipaddress.ip_address(ip_value)
+    except ValueError:
+        return False
+
+    return ip.version == 4 and not ip.is_loopback
+
+#-------------------------------------------------------------------------------
+def adguard_parse_lease_expires(expires_value):
+    if expires_value in [None, ""]:
+        return 0
+
+    try:
+        return int(expires_value)
+    except (TypeError, ValueError):
+        pass
+
+    if isinstance(expires_value, str):
+        try:
+            return int(datetime.datetime.fromisoformat(expires_value.replace("Z", "+00:00")).timestamp())
+        except ValueError:
+            return 0
+
+    return 0
+
+#-------------------------------------------------------------------------------
+def adguard_format_timestamp(date_value):
+    if not isinstance(date_value, datetime.datetime):
+        return ""
+
+    return date_value.astimezone(datetime.timezone.utc).isoformat()
+
+#-------------------------------------------------------------------------------
+def adguard_normalize_dhcp_leases(lease_payload):
+    normalized_leases = {}
+    dynamic_leases = lease_payload.get("leases", [])
+    static_leases = lease_payload.get("static_leases", [])
+
+    for lease in dynamic_leases + static_leases:
+        ip = str(adguard_get_first_value(lease, ["ip", "address"]))
+        mac = str(adguard_get_first_value(lease, ["mac", "hwaddr"]))
+        name = str(adguard_get_first_value(lease, ["hostname", "name", "host"], "(unknown)"))
+        expires = adguard_parse_lease_expires(
+            adguard_get_first_value(lease, ["expires", "expire", "expiration_time"], 0)
+        )
+
+        if not adguard_is_valid_ipv4(ip):
+            continue
+        if mac == "":
+            continue
+
+        normalized_leases[ip] = {
+            "mac": mac.lower(),
+            "ip": ip,
+            "name": name,
+            "connected": False,
+            "lease_expires": expires,
+            "last_query_time": None,
+        }
+
+    return normalized_leases
+
+#-------------------------------------------------------------------------------
+def adguard_mark_active_from_queries(devices_by_ip, latest_queries):
+    unmatched_queries = {}
+
+    for ip, query in latest_queries.items():
+        if ip not in devices_by_ip:
+            unmatched_queries[ip] = query
+            continue
+
+        devices_by_ip[ip]["connected"] = True
+        devices_by_ip[ip]["last_query_time"] = query["time"]
+
+        query_name = query.get("client_name", "").strip()
+        if query_name and devices_by_ip[ip]["name"] in ["", "(unknown)"]:
+            devices_by_ip[ip]["name"] = query_name
+
+    return unmatched_queries
+
+#-------------------------------------------------------------------------------
+def adguard_build_network_state(devices_by_ip):
+    devices_by_mac = {}
+
+    for ip in sorted(devices_by_ip):
+        device = devices_by_ip[ip]
+        mac = device["mac"].lower()
+        devices_by_mac[mac] = {
+            "MAC": device["mac"],
+            "IP": device["ip"],
+            "Name": device["name"],
+            "Vendor": "",
+            "Method": "AdGuard",
+            "Interface": "",
+            "Custom_a": device["lease_expires"],
+            "Custom_b": adguard_format_timestamp(device["last_query_time"]),
+            "Connected": 1 if device["connected"] else 0,
+            "Datetime": device["lease_expires"],
+        }
+
+    return devices_by_mac
+
+#-------------------------------------------------------------------------------
+def read_adguard_data():
+    if not ADGUARD_ACTIVE:
+        return {}
+
+    print("    AdGuard Method...")
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {
+        "name": ADGUARD_USER,
+        "password": ADGUARD_PASSWORD,
+    }
+
+    protocol_order = ["https", "http"] if ADGUARD_SSL else ["http", "https"]
+    cookies = None
+    base_url = None
+
+    for protocol in protocol_order:
+        cookies, base_url = adguard_try_login(protocol, ADGUARD_IP, ADGUARD_PORT, headers, payload)
+        if cookies is not None:
+            break
+
+    if cookies is None:
+        print("        ...Skipped - Connection failed")
+        return {}
+
+    lease_payload = adguard_get_dhcp_leases(cookies, base_url, headers)
+    latest_queries = adguard_get_current_queries_per_client(
+        cookies,
+        base_url,
+        headers,
+        limit=ADGUARD_QUERY_LIMIT,
+    )
+
+    devices_by_ip = adguard_normalize_dhcp_leases(lease_payload)
+    unmatched_queries = adguard_mark_active_from_queries(devices_by_ip, latest_queries)
+    network_state = adguard_build_network_state(devices_by_ip)
+
+    print_log(network_state)
+    print_log(unmatched_queries)
+    return network_state
 
 #-------------------------------------------------------------------------------
 def copy_pihole_network():
@@ -1258,7 +1924,7 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
-def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp, p_pfsense_network):
+def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp, p_pfsense_network, p_opnsense_network, p_adguard_network):
 
     all_devices = []
     # Internet Check
@@ -1309,6 +1975,30 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
                     'cur_hostname': device.get('Name', '(unknown)'),
                     'cur_Vendor': "",
                     'cur_ScanMethod': 'pfSense',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                })
+    # OPNsense
+    if p_opnsense_network:
+        for mac, device in p_opnsense_network.items():
+            if device.get("Connected") and len(mac) > 12:
+                all_devices.append({
+                    'cur_MAC': device.get('MAC', mac),
+                    'cur_IP': device.get('IP', ''),
+                    'cur_hostname': device.get('Name', '(unknown)'),
+                    'cur_Vendor': device.get('Vendor', ''),
+                    'cur_ScanMethod': 'OPNsense',
+                    'cur_SatelliteID': SATELLITE_TOKEN
+                })
+    # AdGuard
+    if p_adguard_network:
+        for mac, device in p_adguard_network.items():
+            if device.get("Connected") and len(mac) > 12:
+                all_devices.append({
+                    'cur_MAC': device.get('MAC', mac),
+                    'cur_IP': device.get('IP', ''),
+                    'cur_hostname': device.get('Name', '(unknown)'),
+                    'cur_Vendor': device.get('Vendor', ''),
+                    'cur_ScanMethod': 'AdGuard',
                     'cur_SatelliteID': SATELLITE_TOKEN
                 })
     # Arpscan
@@ -1425,7 +2115,9 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'scan_asuswrt': ASUSWRT_ACTIVE,
         'scan_pihole_net': PIHOLE_ACTIVE,
         'scan_pihole_dhcp': PIHOLE_DHCP_ACTIVE,
-        'scan_pfsense': PFSENSE_ACTIVE
+        'scan_pfsense': PFSENSE_ACTIVE,
+        'scan_opnsense': OPNSENSE_ACTIVE,
+        'scan_adguard': ADGUARD_ACTIVE
     }]
 
     # Write Data to JSON-file
