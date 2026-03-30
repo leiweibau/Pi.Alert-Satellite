@@ -194,6 +194,38 @@ PFSENSE_EXCLUDE_INT       = ['WAN']
 EOF
 fi
 
+# 2026-03-30
+if ! grep -Fq "# OPNsense Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# OPNsense Configuration
+# ----------------------
+OPNSENSE_ACTIVE           = False
+OPNSENSE_IP               = '192.168.1.1'
+OPNSENSE_PORT             = 443
+OPNSENSE_APIKEY           = ''
+OPNSENSE_APISECRET        = ''
+OPNSENSE_SSL              = True
+OPNSENSE_EXCLUDE_INT      = ['WAN']
+EOF
+fi
+
+# 2026-03-30
+if ! grep -Fq "# AdGuard Configuration" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# AdGuard Configuration
+# ----------------------
+ADGUARD_ACTIVE            = False
+ADGUARD_IP                = '192.168.1.1'
+ADGUARD_PORT              = 3000
+ADGUARD_USER              = ''
+ADGUARD_PASSWORD          = ''
+ADGUARD_SSL               = False
+ADGUARD_QUERY_LIMIT       = 1000
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------
