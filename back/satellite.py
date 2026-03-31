@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #-------------------------------------------------------------------------------
 #  Pi.Alert Satellite
@@ -10,7 +10,6 @@
 #===============================================================================
 # IMPORTS
 #===============================================================================
-from __future__ import print_function
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -43,12 +42,59 @@ PIHOLE6_SES_CSRF = ""
 # Only for debugging. Unencrypted scan results will be stored on the satellite
 DEBUG_JSON_OUTPUT = False
 
-if (sys.version_info > (3,0)):
-    exec(open(SATELLITE_PATH + "/config/version.conf").read())
-    exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
-else:
-    execfile(SATELLITE_PATH + "/config/version.conf")
-    execfile(SATELLITE_PATH + "/config/satellite.conf")
+exec(open(SATELLITE_PATH + "/config/version.conf").read())
+exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
+
+RAW_CONFIG_SECRET_KEYS = [
+    'SATELLITE_PASSWORD',
+    'SMTP_PASS',
+    'FRITZBOX_PASS',
+    'MIKROTIK_PASS',
+    'UNIFI_PASS',
+    'OPENWRT_PASS',
+    'ASUSWRT_PASS',
+    'PFSENSE_APIKEY',
+    'OPNSENSE_APIKEY',
+    'OPNSENSE_APISECRET',
+    'ADGUARD_PASSWORD',
+    'PIHOLE6_PASSWORD',
+]
+
+#-------------------------------------------------------------------------------
+def recover_sensitive_config_values(config_file, secret_keys):
+    def contains_control_characters(value):
+        return isinstance(value, str) and any(ord(char) < 32 for char in value)
+
+    try:
+        lines = open(config_file, encoding='utf-8').read().splitlines()
+    except OSError:
+        return
+
+    for line in lines:
+        match = re.match(r"^\s*([A-Z0-9_]+)\s*=\s*(['\"])(.*)\2\s*$", line)
+        if not match:
+            continue
+
+        key = match.group(1)
+        quote = match.group(2)
+        raw_value = match.group(3)
+
+        if key not in secret_keys:
+            continue
+
+        current_value = globals().get(key, '')
+        if not contains_control_characters(current_value):
+            continue
+
+        recovered_value = raw_value.replace("\\\\", "\\")
+        if quote == "'":
+            recovered_value = recovered_value.replace("\\'", "'")
+        else:
+            recovered_value = recovered_value.replace('\\"', '"')
+
+        globals()[key] = recovered_value
+
+recover_sensitive_config_values(SATELLITE_PATH + "/config/satellite.conf", RAW_CONFIG_SECRET_KEYS)
 
 #===============================================================================
 # MAIN
@@ -351,12 +397,12 @@ def pfsense_mark_local_interfaces(interfaces, p_pfsense_processed):
             interfaces = json.loads(interfaces)
         except json.JSONDecodeError:
             print_log("        ...❌ Error: invalid JSON-format (interfaces)")
-            return [], []
+            return p_pfsense_processed
 
     local_interfaces = []
     if not interfaces or "data" not in interfaces:
         print_log("⚠️ no local interfaces were found")
-        return local_interfaces
+        return p_pfsense_processed
 
     for entry in interfaces["data"]:
         mac = (entry.get("mac") or "").strip().lower()
@@ -395,14 +441,14 @@ def pfsense_save_dhcp_data(pfsense_dhcpleases):
             pfsense_dhcpleases = json.loads(pfsense_dhcpleases)
         except json.JSONDecodeError:
             print_log("        ...❌ Error: invalid JSON-format (pfsense_dhcpleases)")
-            return [], []
+            return {}
 
     pfsense_network_dhcp = []
 
     # Check if "data" exists
     if not pfsense_dhcpleases or "data" not in pfsense_dhcpleases:
         print_log("⚠️ no DHCP-Leases were found")
-        return pfsense_network_dhcp
+        return {}
 
     for entry in pfsense_dhcpleases["data"]:
         mac = entry.get("mac", "").strip().lower()
@@ -435,11 +481,11 @@ def pfsense_save_dhcp_data(pfsense_dhcpleases):
             "Datetime": ends_ts
         })
 
-        dict_pfsense_processed = {
-            item["MAC"].lower(): item
-            for item in pfsense_network_dhcp
-            if item.get("MAC")
-        }
+    dict_pfsense_processed = {
+        item["MAC"].lower(): item
+        for item in pfsense_network_dhcp
+        if item.get("MAC")
+    }
 
     print_log(pfsense_network_dhcp)
     return dict_pfsense_processed
@@ -452,24 +498,24 @@ def pfsense_save_arp_data(pfsense_arptable, interfaces, p_pfsense_processed):
             pfsense_arptable = json.loads(pfsense_arptable)
         except json.JSONDecodeError:
             print_log("        ...❌ Error: invalid JSON-format (pfsense_arptable)")
-            return [], []
+            return p_pfsense_processed
 
     if isinstance(interfaces, str):
         try:
             interfaces = json.loads(interfaces)
         except json.JSONDecodeError:
             print_log("        ...❌ Error: invalid JSON-format (interfaces)")
-            return [], []
+            return p_pfsense_processed
 
     pfsense_arp_list = []
     # Check if "data" exists
     if not pfsense_arptable or "data" not in pfsense_arptable:
         print_log("⚠️ no valid ARP-data found.")
-        return pfsense_arp_list
+        return p_pfsense_processed
 
     local_interfaces = []
     if not interfaces or "data" not in interfaces:
-        return local_interfaces
+        return p_pfsense_processed
 
     for entry in interfaces["data"]:
         mac = (entry.get("mac") or "").strip().lower()
@@ -2322,8 +2368,7 @@ def send_email(pText, pHTML, logs):
             smtp_connection.starttls()
             smtp_connection.ehlo()
         if not SafeParseGlobalBool("SMTP_SKIP_LOGIN"):
-            escaped_password = repr(SMTP_PASS)[1:-1]
-            smtp_connection.login (SMTP_USER, escaped_password)
+            smtp_connection.login (SMTP_USER, SMTP_PASS)
         smtp_connection.sendmail (MAIL_FROM, MAIL_TO, msg.as_string())
     except Exception as e:
         print(f"    Error sending the e-mail")
