@@ -226,6 +226,17 @@ ADGUARD_QUERY_LIMIT       = 1000
 EOF
 fi
 
+# 2026-03-31
+if ! grep -Fq "QUERY_MYIP_SERVER_FALLBACK" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  if grep -Fq "QUERY_MYIP_SERVER" "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+    sed -i "/QUERY_MYIP_SERVER/a QUERY_MYIP_SERVER_FALLBACK = 'https://api.ipify.org?format=json'" "$PIALERT_SATELLITE_HOME/config/satellite.conf" 2>&1 >> "$LOG"
+  else
+    cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+QUERY_MYIP_SERVER_FALLBACK = 'https://api.ipify.org?format=json'
+EOF
+  fi
+fi
+
 }
 
 # ------------------------------------------------------------------------------
