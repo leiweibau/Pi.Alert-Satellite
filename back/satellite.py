@@ -1768,7 +1768,13 @@ def read_openwrt_clients():
 
     try:
         escaped_password = repr(OPENWRT_PASS)[1:-1]
-        router = OpenWrtRpc(str(OPENWRT_IP), str(OPENWRT_USER), escaped_password)
+        router = OpenWrtRpc(
+            str(OPENWRT_IP),
+            str(OPENWRT_USER),
+            escaped_password,
+            is_https=globals().get("OPENWRT_HTTPS", False),
+            verify_https=globals().get("OPENWRT_VERIFY_SSL", True),
+        )
         result = router.get_all_connected_devices(only_reachable=True)
 
         for device in result:
