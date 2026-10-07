@@ -679,42 +679,22 @@ def opnsense_connect(endpoint, topic):
 def read_opnsense_clients():
 
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    opnsense_dhcpleases = ""
-    opnsense_arptable = ""
-    opnsense_interfaces = ""
-    opnsense_interface_names = ""
-    opnsense_processed = {}
+    if not OPNSENSE_ACTIVE:
+        return {}
 
-    if OPNSENSE_ACTIVE:
-        print("    OPNsense Method...")
-        result = opnsense_fetch_dhcp_leases()
-        print_log(result)
-        if result:
-            opnsense_dhcpleases = json.dumps(result, indent=4)
+    print("    OPNsense Method...")
+    opnsense_arptable = opnsense_connect("/api/diagnostics/interface/search_arp", "ARP")
+    if opnsense_arptable is None:
+        print("        ...ARP unavailable; no OPNsense clients reported")
+        return {}
 
-        endpoint = "/api/diagnostics/interface/search_arp"
-        result = opnsense_connect(endpoint, "ARP")
-        print_log(result)
-        if result:
-            opnsense_arptable = json.dumps(result, indent=4)
+    opnsense_dhcpleases = opnsense_fetch_dhcp_leases()
+    opnsense_interfaces = opnsense_connect("/api/diagnostics/interface/get_interface_config", "Interfaces")
+    opnsense_interface_names = opnsense_connect("/api/diagnostics/interface/get_interface_names", "Interface Names")
 
-        endpoint = "/api/diagnostics/interface/get_interface_config"
-        result = opnsense_connect(endpoint, "Interfaces")
-        print_log(result)
-        if result:
-            opnsense_interfaces = json.dumps(result, indent=4)
-
-        endpoint = "/api/diagnostics/interface/get_interface_names"
-        result = opnsense_connect(endpoint, "Interface Names")
-        print_log(result)
-        if result:
-            opnsense_interface_names = json.dumps(result, indent=4)
-
-        opnsense_processed = opnsense_save_dhcp_data(opnsense_dhcpleases)
-        opnsense_processed = opnsense_save_arp_data(opnsense_arptable, opnsense_interfaces, opnsense_interface_names, opnsense_processed)
-        opnsense_processed = opnsense_mark_local_interfaces(opnsense_interfaces, opnsense_interface_names, opnsense_processed)
-
-    return opnsense_processed
+    dhcp_by_address = opnsense_save_dhcp_data(opnsense_dhcpleases)
+    opnsense_processed = opnsense_save_arp_data(opnsense_arptable, opnsense_interfaces, dhcp_by_address)
+    return opnsense_mark_local_interfaces(opnsense_interfaces, opnsense_interface_names, opnsense_processed)
 
 #-------------------------------------------------------------------------------
 def opnsense_fetch_dhcp_leases():
@@ -724,19 +704,16 @@ def opnsense_fetch_dhcp_leases():
         ("/api/kea/leases4/search", "Kea DHCP")
     ]
 
-    first_response = None
+    lease_rows = []
 
     for endpoint, topic in dhcp_endpoints:
         result = opnsense_connect(endpoint, topic)
+        rows = opnsense_get_rows(result)
+        if rows:
+            print_log(f"        ...OPNsense {topic}: {len(rows)} leases")
+            lease_rows.extend(rows)
 
-        if first_response is None and result is not None:
-            first_response = result
-
-        if opnsense_get_rows(result):
-            print_log(f"        ...OPNsense DHCP backend selected: {topic}")
-            return result
-
-    return first_response
+    return lease_rows
 
 #-------------------------------------------------------------------------------
 def opnsense_get_rows(payload):
@@ -854,22 +831,6 @@ def opnsense_save_dhcp_data(opnsense_dhcpleases):
                 except (ValueError, TypeError):
                     ends_ts = 0
 
-        status = str(entry.get("status") or "").lower()
-        state = str(entry.get("state") or "").lower()
-        active = entry.get("active")
-        expired = entry.get("expired")
-
-        if status != "":
-            opn_connected = status == "online"
-        elif active is not None:
-            opn_connected = bool(active)
-        elif expired is not None:
-            opn_connected = not bool(expired)
-        elif state != "":
-            opn_connected = state not in ["expired", "offline", "released", "free"]
-        else:
-            opn_connected = True
-
         opnsense_network_dhcp.append({
             "MAC": mac,
             "IP": ip,
@@ -879,47 +840,45 @@ def opnsense_save_dhcp_data(opnsense_dhcpleases):
             "Interface": if_descr,
             "Custom_a": entry.get("type", ""),
             "Custom_b": entry.get("state", ""),
-            "Connected": opn_connected,
+            "Connected": False,
             "Datetime": ends_ts
         })
 
     dict_opnsense_processed = {
-        item["MAC"].lower(): item
+        (item["MAC"], item["IP"]): item
         for item in opnsense_network_dhcp
-        if item.get("MAC")
     }
 
     print_log(opnsense_network_dhcp)
     return dict_opnsense_processed
 
 #-------------------------------------------------------------------------------
-def opnsense_save_arp_data(opnsense_arptable, interfaces, interface_names, p_opnsense_processed):
+def opnsense_save_arp_data(opnsense_arptable, interfaces, dhcp_by_address):
 
     if isinstance(opnsense_arptable, str):
         try:
             opnsense_arptable = json.loads(opnsense_arptable)
         except json.JSONDecodeError:
             print_log("        ...Error: invalid JSON-format (opnsense_arptable)")
-            return p_opnsense_processed
+            return {}
 
     if isinstance(interfaces, str):
         try:
             interfaces = json.loads(interfaces)
         except json.JSONDecodeError:
             print_log("        ...Error: invalid JSON-format (interfaces)")
-            return p_opnsense_processed
+            interfaces = {}
 
-    interface_map = opnsense_get_interface_map(interface_names)
     arp_rows = opnsense_get_rows(opnsense_arptable)
     opnsense_arp_list = []
 
     if not arp_rows:
         print_log("        ...Info: no valid ARP-data found.")
-        return p_opnsense_processed
+        return {}
 
-    local_interfaces = []
+    local_interfaces = set()
     if isinstance(interfaces, dict):
-        for if_name, if_data in interfaces.items():
+        for if_data in interfaces.values():
             if not isinstance(if_data, dict):
                 continue
 
@@ -931,10 +890,7 @@ def opnsense_save_arp_data(opnsense_arptable, interfaces, interface_names, p_opn
             ).strip().lower()
 
             if mac:
-                local_interfaces.append({
-                    "MAC": mac,
-                    "Description": interface_map.get(if_name, if_name.upper())
-                })
+                local_interfaces.add(mac)
 
     for entry in arp_rows:
         mac = (entry.get("mac") or entry.get("mac-address") or entry.get("mac_address") or "").strip().lower()
@@ -953,9 +909,9 @@ def opnsense_save_arp_data(opnsense_arptable, interfaces, interface_names, p_opn
 
         arpexpires = "" if expires_raw is None else str(expires_raw).strip()
 
-        if interface.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and all(mac != local_entry["MAC"] for local_entry in local_interfaces):
+        if interface.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and mac not in local_interfaces:
             continue
-        if interface_raw.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and all(mac != local_entry["MAC"] for local_entry in local_interfaces):
+        if interface_raw.lower() in (i.lower() for i in OPNSENSE_EXCLUDE_INT) and mac not in local_interfaces:
             continue
 
         match = re.search(r"Expires\s+in\s+(\d+)\s+seconds", arpexpires, flags=re.I)
@@ -994,46 +950,34 @@ def opnsense_save_arp_data(opnsense_arptable, interfaces, interface_names, p_opn
             "Datetime": ""
         })
 
-    arp_macs = {entry["MAC"] for entry in opnsense_arp_list}
-
+    opnsense_processed = {}
+    ambiguous_macs = set()
     for entry in opnsense_arp_list:
-        mac = entry["MAC"].lower()
+        if not entry["Connected"]:
+            continue
 
-        if mac in p_opnsense_processed:
-            present_mac = p_opnsense_processed[mac]
+        mac = entry["MAC"]
+        if mac in ambiguous_macs:
+            continue
+        if mac in opnsense_processed and opnsense_processed[mac]["IP"] != entry["IP"]:
+            ambiguous_macs.add(mac)
+            del opnsense_processed[mac]
+            print_log(f"        ...multiple active ARP addresses for {mac}; client skipped")
+            continue
 
-            if (not present_mac["Interface"] or present_mac["Interface"].strip() == "") and entry["Interface"]:
-                present_mac["Interface"] = entry["Interface"]
-
-            if (present_mac.get("Name") in ["", "(unknown)"]) and entry["Name"] and entry["Name"] != "(unknown)":
-                present_mac["Name"] = entry["Name"]
-
-            if entry["Vendor"] and not present_mac.get("Vendor"):
-                present_mac["Vendor"] = entry["Vendor"]
-
-            present_mac["Connected"] = entry["Connected"]
-
-        else:
-            p_opnsense_processed[mac] = {
-                "MAC": entry["MAC"],
-                "IP": entry["IP"],
-                "Name": entry["Name"],
-                "Vendor": entry["Vendor"],
-                "Method": entry["Method"],
-                "Interface": entry["Interface"],
-                "Custom_a": entry["Custom_a"],
-                "Custom_b": entry["Custom_b"],
-                "Connected": entry["Connected"],
-                "Datetime": entry["Datetime"]
-            }
-
-    if arp_macs:
-        for mac, device in p_opnsense_processed.items():
-            if mac not in arp_macs:
-                device["Connected"] = False
+        lease = dhcp_by_address.get((mac, entry["IP"]))
+        device = lease.copy() if lease else entry.copy()
+        device["IP"] = entry["IP"]
+        device["Interface"] = entry["Interface"] or device["Interface"]
+        device["Connected"] = True
+        if device["Name"] in ["", "(unknown)"] and entry["Name"] != "(unknown)":
+            device["Name"] = entry["Name"]
+        if not device["Vendor"] and entry["Vendor"]:
+            device["Vendor"] = entry["Vendor"]
+        opnsense_processed[mac] = device
 
     print_log(opnsense_arp_list)
-    return p_opnsense_processed
+    return opnsense_processed
 
 #-------------------------------------------------------------------------------
 def adguard_try_login(protocol, host, port, headers, payload):
