@@ -1943,6 +1943,49 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
+def get_cpu_frequency(cpu_info):
+    for raw_key, friendly_key in (
+        ('hz_actual', 'hz_actual_friendly'),
+        ('hz_advertised', 'hz_advertised_friendly'),
+    ):
+        hz = cpu_info.get(raw_key)
+        if isinstance(hz, (list, tuple)):
+            hz = hz[0] if hz else None
+        if isinstance(hz, (int, float)) and hz <= 0:
+            continue
+
+        friendly = cpu_info.get(friendly_key)
+        if isinstance(friendly, str) and friendly.strip():
+            return friendly.strip()
+        if isinstance(hz, (int, float)):
+            if hz >= 1_000_000_000:
+                return f'{hz / 1_000_000_000:.4f} GHz'
+            if hz >= 1_000_000:
+                return f'{hz / 1_000_000:.2f} MHz'
+            return f'{hz:.0f} Hz'
+
+    try:
+        frequency = psutil.cpu_freq()
+    except (OSError, RuntimeError):
+        frequency = None
+    if frequency and frequency.current > 0:
+        return f'{frequency.current / 1000:.4f} GHz'
+    return 'unknown'
+
+
+def get_cpu_metadata():
+    try:
+        cpu_info = cpuinfo.get_cpu_info() or {}
+    except Exception:
+        cpu_info = {}
+
+    name = cpu_info.get('brand') or cpu_info.get('brand_raw') or platform.processor() or 'unknown'
+    arch = cpu_info.get('arch') or cpu_info.get('arch_string_raw') or platform.machine() or 'unknown'
+    cores = cpu_info.get('count') or os.cpu_count() or 0
+    return name, arch, cores, get_cpu_frequency(cpu_info)
+
+
+#-------------------------------------------------------------------------------
 def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_network, p_mikrotik_network, p_unifi_network, p_openwrt_network, p_asuswrt_network, p_pihole_network, p_pihole_dhcp, p_pfsense_network, p_opnsense_network, p_adguard_network):
 
     all_devices = []
@@ -2090,17 +2133,7 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
     # Get local timezone
     sat_os_timezone = tzlocal.get_localzone()
 
-    cpu_info = cpuinfo.get_cpu_info()
-
-    try:
-        cpu_brand = cpu_info['brand']
-    except KeyError:
-        cpu_brand = cpu_info['brand_raw']
-
-    try:
-        cpu_arch = cpu_info['arch']
-    except KeyError:
-        cpu_arch = cpu_info['arch_string_raw']
+    cpu_brand, cpu_arch, cpu_cores, cpu_freq = get_cpu_metadata()
 
     # Prepare Satellite Meta Data
     satellite_meta_data = [{
@@ -2115,8 +2148,8 @@ def save_scanned_devices(p_internet_detection, p_arpscan_devices, p_fritzbox_net
         'uptime': formatted_uptime,
         'cpu_name': cpu_brand,
         'cpu_arch': cpu_arch,
-        'cpu_cores': cpu_info['count'],
-        'cpu_freq': cpu_info['hz_actual'],
+        'cpu_cores': cpu_cores,
+        'cpu_freq': cpu_freq,
         'ram_total': psutil.virtual_memory()[0],
         'ram_used_percent': psutil.virtual_memory()[2],
         'proc_count': proc_count,
