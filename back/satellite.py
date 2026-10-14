@@ -1943,6 +1943,10 @@ def process_devices(network, scan_method, all_devices):
                 all_devices.append(device_data)
 
 #-------------------------------------------------------------------------------
+def format_cpu_frequency(value, unit):
+    return f'{value:.2f}'.rstrip('0').rstrip('.') + f' {unit}'
+
+
 def get_cpu_frequency(cpu_info):
     for raw_key, friendly_key in (
         ('hz_actual', 'hz_actual_friendly'),
@@ -1955,21 +1959,24 @@ def get_cpu_frequency(cpu_info):
             continue
 
         friendly = cpu_info.get(friendly_key)
-        if isinstance(friendly, str) and friendly.strip():
-            return friendly.strip()
         if isinstance(hz, (int, float)):
             if hz >= 1_000_000_000:
-                return f'{hz / 1_000_000_000:.4f} GHz'
+                return format_cpu_frequency(hz / 1_000_000_000, 'GHz')
             if hz >= 1_000_000:
-                return f'{hz / 1_000_000:.2f} MHz'
-            return f'{hz:.0f} Hz'
+                return format_cpu_frequency(hz / 1_000_000, 'MHz')
+            return format_cpu_frequency(hz, 'Hz')
+        if isinstance(friendly, str) and friendly.strip():
+            match = re.fullmatch(r'(\d+(?:\.\d+)?)\s*(GHz|MHz|kHz|Hz)', friendly.strip(), re.I)
+            if match:
+                return format_cpu_frequency(float(match.group(1)), match.group(2))
+            return friendly.strip()
 
     try:
         frequency = psutil.cpu_freq()
     except (OSError, RuntimeError):
         frequency = None
     if frequency and frequency.current > 0:
-        return f'{frequency.current / 1000:.4f} GHz'
+        return format_cpu_frequency(frequency.current / 1000, 'GHz')
     return 'unknown'
 
 
