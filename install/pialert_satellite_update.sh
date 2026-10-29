@@ -251,6 +251,28 @@ EOF
   fi
 fi
 
+# 2026-10-29: HTTP Basic Authentication for the Pi.Alert upload endpoint.
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_ACTIVE[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+SATELLITE_HTTP_BASIC_AUTH_ACTIVE = False
+EOF
+fi
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_USER[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+SATELLITE_HTTP_BASIC_AUTH_USER = ''
+EOF
+fi
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_PASSWORD[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# Enter the password directly after '=' without quotes or escaping.
+# Special characters are taken literally; spaces after '=' are part of the password.
+SATELLITE_HTTP_BASIC_AUTH_PASSWORD=
+EOF
+fi
+
 }
 
 # ------------------------------------------------------------------------------

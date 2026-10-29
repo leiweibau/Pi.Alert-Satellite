@@ -43,7 +43,24 @@ PIHOLE6_SES_CSRF = ""
 DEBUG_JSON_OUTPUT = False
 
 exec(open(SATELLITE_PATH + "/config/version.conf").read())
-exec(open(SATELLITE_PATH + "/config/satellite.conf").read())
+
+# This password is a literal line in the config, not a Python string literal.
+def load_satellite_config(config_path):
+    password = ''
+    python_config = []
+    with open(config_path, encoding='utf-8') as config_file:
+        for line in config_file:
+            if re.match(r'^\s*SATELLITE_HTTP_BASIC_AUTH_PASSWORD\s*=', line):
+                password = line.partition('=')[2].rstrip('\r\n')
+            else:
+                python_config.append(line)
+    exec(''.join(python_config), globals())
+    return password
+
+
+SATELLITE_HTTP_BASIC_AUTH_ACTIVE = False
+SATELLITE_HTTP_BASIC_AUTH_USER = ''
+SATELLITE_HTTP_BASIC_AUTH_PASSWORD = load_satellite_config(SATELLITE_PATH + "/config/satellite.conf")
 
 RAW_CONFIG_SECRET_KEYS = [
     'SATELLITE_PASSWORD',
@@ -2230,7 +2247,13 @@ def encrypt_submit_scandata(json_data):
     # API-URL
     api_url = SATELLITE_MASTER_URL
     # Send the request to the API, deactivating SSL verification in the process
-    response = requests.post(api_url, data=post_data, files=files, verify=False)
+    request_options = {'data': post_data, 'files': files, 'verify': False}
+    if SATELLITE_HTTP_BASIC_AUTH_ACTIVE:
+        request_options['auth'] = (
+            SATELLITE_HTTP_BASIC_AUTH_USER.encode('utf-8'),
+            SATELLITE_HTTP_BASIC_AUTH_PASSWORD.encode('utf-8'),
+        )
+    response = requests.post(api_url, **request_options)
     try:
         response_data = response.json()
         print(f"    API-Response: {response_data}")
