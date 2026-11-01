@@ -145,9 +145,23 @@ OPENWRT_ACTIVE   = False
 OPENWRT_IP       = '192.168.1.1'
 OPENWRT_USER     = 'root'
 OPENWRT_PASS     = ''
+OPENWRT_HTTPS    = True
+OPENWRT_VERIFY_SSL = False
 
 
 NETWORK_DNS_SERVER    = 'localhost'
+EOF
+fi
+
+# Preserve HTTP behavior for installations that predate these options.
+if ! grep -Eq '^[[:space:]]*OPENWRT_HTTPS[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+OPENWRT_HTTPS = False
+EOF
+fi
+if ! grep -Eq '^[[:space:]]*OPENWRT_VERIFY_SSL[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat << EOF >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+OPENWRT_VERIFY_SSL = True
 EOF
 fi
 
@@ -235,6 +249,28 @@ if ! grep -Fq "QUERY_MYIP_SERVER_FALLBACK" "$PIALERT_SATELLITE_HOME/config/satel
 QUERY_MYIP_SERVER_FALLBACK = 'https://api.ipify.org?format=json'
 EOF
   fi
+fi
+
+# 2026-10-29: HTTP Basic Authentication for the Pi.Alert upload endpoint.
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_ACTIVE[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+SATELLITE_HTTP_BASIC_AUTH_ACTIVE = False
+EOF
+fi
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_USER[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+SATELLITE_HTTP_BASIC_AUTH_USER = ''
+EOF
+fi
+if ! grep -Eq '^[[:space:]]*SATELLITE_HTTP_BASIC_AUTH_PASSWORD[[:space:]]*=' "$PIALERT_SATELLITE_HOME/config/satellite.conf" ; then
+  cat <<'EOF' >> "$PIALERT_SATELLITE_HOME/config/satellite.conf"
+
+# Enter the password directly after '=' without quotes or escaping.
+# Special characters are taken literally; spaces after '=' are part of the password.
+SATELLITE_HTTP_BASIC_AUTH_PASSWORD=
+EOF
 fi
 
 }
